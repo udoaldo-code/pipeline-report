@@ -52,10 +52,11 @@ export async function GET(req: Request) {
     cache = { payload, expiresAt: now + CACHE_TTL_MS };
     return NextResponse.json({ ...payload, source: "jira" } satisfies Payload);
   } catch (err) {
+    console.error("[/api/jira/deals]", err);
     const message =
-      err instanceof JiraConfigError ? `config: ${err.message}` :
-      err instanceof JiraApiError    ? `api ${err.status}: ${err.message}` :
-      `unknown: ${(err as Error).message}`;
+      err instanceof JiraConfigError ? "config error" :
+      err instanceof JiraApiError    ? `Jira API error (${err.status})` :
+      "unknown error";
     return NextResponse.json({ ok: false as const, error: message, syncedAt: null }, { status: 502 });
   }
 }

@@ -388,7 +388,7 @@ function DealCard({ deal, pipeline, onClick, i=0 }: { deal: Deal; pipeline: Pipe
 ════════════════════════════════════════════ */
 function BoardView({pipeline, deals, onOpen, stages}: { pipeline: Pipeline; deals: Deal[]; onOpen: (d: Deal) => void; stages: string[] }) {
   const [sel, setSel] = useState(stages[0]);
-  useEffect(()=>setSel(stages[0]),[pipeline.id]);
+  useEffect(()=>setSel(stages[0]),[pipeline.id, stages]);
   const sd = deals.filter(d=>d.stage===sel);
   const sv = sd.reduce((s,d)=>s+(d.val||0),0);
   return (
@@ -1071,7 +1071,7 @@ export default function Page() {
                     </tr>
                   </thead>
                   <tbody>
-                    {PIPES.map(p=>{
+                    {VISIBLE_PIPES.map(p=>{
                       const pd = deals.filter(d=>d.pid===p.id);
                       const pv = pd.reduce((s,d)=>s+(d.val||0),0);
                       const pa = pd.filter(d=>!["Closed Lost","Inactive","On Hold"].includes(d.stage)).length;
