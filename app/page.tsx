@@ -386,15 +386,15 @@ function DealCard({ deal, pipeline, onClick, i=0 }: { deal: Deal; pipeline: Pipe
 /* ════════════════════════════════════════════
    BOARD VIEW
 ════════════════════════════════════════════ */
-function BoardView({ pipeline, deals, onOpen }: { pipeline: Pipeline; deals: Deal[]; onOpen: (d: Deal) => void }) {
-  const [sel, setSel] = useState(pipeline.stages[0]);
-  useEffect(()=>setSel(pipeline.stages[0]),[pipeline.id]);
+function BoardView({pipeline, deals, onOpen, stages}: { pipeline: Pipeline; deals: Deal[]; onOpen: (d: Deal) => void; stages: string[] }) {
+  const [sel, setSel] = useState(stages[0]);
+  useEffect(()=>setSel(stages[0]),[pipeline.id]);
   const sd = deals.filter(d=>d.stage===sel);
   const sv = sd.reduce((s,d)=>s+(d.val||0),0);
   return (
     <div style={{padding:"16px"}}>
       <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:8,marginBottom:12}}>
-        {pipeline.stages.map(s=>{
+        {stages.map(s=>{
           const cnt = deals.filter(d=>d.stage===s).length, act = sel===s;
           return (
             <button key={s} onClick={()=>setSel(s)} className="btn"
@@ -681,7 +681,7 @@ function Sheet({children, onClose}: {children: React.ReactNode; onClose: () => v
 /* ════════════════════════════════════════════
    DEAL SHEET
 ════════════════════════════════════════════ */
-function DealSheet({deal, pipeline, onClose, onUpdate, onDel}: { deal: Deal; pipeline: Pipeline; onClose: () => void; onUpdate: (id: string, stage: string, note: string, by: string, dueDate?: string) => void; onDel: (id: string) => void }) {
+function DealSheet({deal, pipeline, onClose, onUpdate, onDel, stages}: { deal: Deal; pipeline: Pipeline; onClose: () => void; onUpdate: (id: string, stage: string, note: string, by: string, dueDate?: string) => void; onDel: (id: string) => void; stages: string[] }) {
   const [stage,   setStage]   = useState(deal.stage);
   const [note,    setNote]    = useState("");
   const [by,      setBy]      = useState("");
@@ -717,7 +717,7 @@ function DealSheet({deal, pipeline, onClose, onUpdate, onDel}: { deal: Deal; pip
           <div>
             <div style={lblSt}>Move to Stage</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-              {pipeline.stages.map(s=>(
+              {stages.map(s=>(
                 <button key={s} onClick={()=>setStage(s)} className="btn"
                   style={{padding:"5px 12px",borderRadius:6,fontSize:12,fontWeight:stage===s?700:500,background:stage===s?pipeline.lt:"#F1F5F9",color:stage===s?pipeline.color:C.inkMid,border:`1.5px solid ${stage===s?pipeline.color:C.border}`}}>
                   {s}
@@ -761,8 +761,8 @@ function DealSheet({deal, pipeline, onClose, onUpdate, onDel}: { deal: Deal; pip
 /* ════════════════════════════════════════════
    ADD SHEET
 ════════════════════════════════════════════ */
-function AddSheet({pipeline, onClose, onAdd}: { pipeline: Pipeline; onClose: () => void; onAdd: (d: Omit<Deal,"id"|"pid"|"at"|"hist">) => void }) {
-  const [f, setF] = useState({name:"",owner:"",stage:pipeline.stages[0],pri:"Medium",val:"",notes:"",dueDate:""});
+function AddSheet({pipeline, onClose, onAdd, stages}: { pipeline: Pipeline; onClose: () => void; onAdd: (d: Omit<Deal,"id"|"pid"|"at"|"hist">) => void; stages: string[] }) {
+  const [f, setF] = useState({name:"",owner:"",stage:stages[0] ?? pipeline.stages[0],pri:"Medium",val:"",notes:"",dueDate:""});
   const upd = (k: string, v: string) => setF(p=>({...p,[k]:v}));
   const ok = f.name.trim().length > 0;
   return (
@@ -780,7 +780,7 @@ function AddSheet({pipeline, onClose, onAdd}: { pipeline: Pipeline; onClose: () 
         <div>
           <div style={lblSt}>Stage</div>
           <select value={f.stage} onChange={e=>upd("stage",e.target.value)} style={{...iSt,appearance:"none" as const}}>
-            {pipeline.stages.map(s=><option key={s}>{s}</option>)}
+            {stages.map(s=><option key={s}>{s}</option>)}
           </select>
         </div>
         <div>
@@ -804,7 +804,7 @@ function AddSheet({pipeline, onClose, onAdd}: { pipeline: Pipeline; onClose: () 
 /* ════════════════════════════════════════════
    SF SHEET
 ════════════════════════════════════════════ */
-function SFSheet({pipeline, onClose, onAdd}: { pipeline: Pipeline; onClose: () => void; onAdd: (d: Omit<Deal,"id"|"pid"|"at"|"hist">) => void }) {
+function SFSheet({pipeline, onClose, onAdd, stages}: { pipeline: Pipeline; onClose: () => void; onAdd: (d: Omit<Deal,"id"|"pid"|"at"|"hist">) => void; stages: string[] }) {
   const [raw,    setRaw]    = useState("");
   const [parsed, setParsed] = useState<ReturnType<typeof sfParse>|null>(null);
   const [pri,    setPri]    = useState("Medium");
@@ -846,7 +846,7 @@ function SFSheet({pipeline, onClose, onAdd}: { pipeline: Pipeline; onClose: () =
       <div style={{padding:"12px 18px",borderTop:`1px solid ${C.border}`,flexShrink:0,display:"flex",gap:9}}>
         <button onClick={onClose} className="btn btn-outline" style={{flex:1,padding:"11px"}}>Cancel</button>
         {parsed && parsed.name && (
-          <button onClick={()=>{ onAdd({...parsed, pri, stage:parsed.stage||pipeline.stages[0]}); onClose(); }} className="btn btn-teal" style={{flex:2,padding:"11px",borderRadius:8,fontSize:13}}>
+          <button onClick={()=>{ onAdd({...parsed, pri, stage:parsed.stage||(stages[0] ?? pipeline.stages[0])}); onClose(); }} className="btn btn-teal" style={{flex:2,padding:"11px",borderRadius:8,fontSize:13}}>
             Import to {pipeline.label}
           </button>
         )}
@@ -867,6 +867,12 @@ export default function Page() {
 
   const [jiraStages, setJiraStages] = useState<{sales: string[] | null; project: string[] | null}>({sales: null, project: null});
   const [sync, setSync] = useState<{at: string | null; ok: boolean; loading: boolean; error: string | null}>({at: null, ok: false, loading: true, error: null});
+
+  const pipelineStages = (pid: string): string[] => {
+    if (pid === "sales"   && jiraStages.sales)   return jiraStages.sales;
+    if (pid === "project" && jiraStages.project) return jiraStages.project;
+    return PIPES.find(p => p.id === pid)?.stages ?? [];
+  };
 
   const [fPipe,  setFPipe]  = useState("all");
   const [fStage, setFStage] = useState("all");
@@ -981,7 +987,7 @@ export default function Page() {
                   <div style={lblSt}>Stage</div>
                   <select className="filter-select" value={fStage} onChange={e=>setFStage(e.target.value)}>
                     <option value="all">All Stages</option>
-                    {pipeline.stages.map(s=><option key={s}>{s}</option>)}
+                    {pipelineStages(pipeline.id).map(s=><option key={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
@@ -1093,7 +1099,7 @@ export default function Page() {
             {/* Deal Content */}
             <div className="card" style={{borderRadius:"0 0 10px 10px",borderTop:"none",overflow:"hidden"}}>
               {view==="report"  && <ReportView  pipeline={pipeline} deals={pDeals} filtered={filtered} fPipe={fPipe} onOpen={d=>setModal({type:"deal",data:d})}/>}
-              {view==="board"   && <BoardView   pipeline={pipeline} deals={pDeals} onOpen={d=>setModal({type:"deal",data:d})}/>}
+              {view==="board"   && <BoardView   pipeline={pipeline} deals={pDeals} onOpen={d=>setModal({type:"deal",data:d})} stages={pipelineStages(pipeline.id)}/>}
               {view==="history" && <HistoryView pipeline={pipeline} deals={pDeals}/>}
               {view==="gantt"   && <GanttView   pipeline={pipeline} deals={pDeals}/>}
             </div>
@@ -1102,9 +1108,9 @@ export default function Page() {
         </div>
       </div>
 
-      {modal?.type==="deal" && <DealSheet deal={modal.data} pipeline={pipeline} onClose={()=>setModal(null)} onUpdate={updateDeal} onDel={delDeal}/>}
-      {modal?.type==="add"  && <AddSheet  pipeline={pipeline} onClose={()=>setModal(null)} onAdd={addDeal}/>}
-      {modal?.type==="sf"   && <SFSheet   pipeline={pipeline} onClose={()=>setModal(null)} onAdd={addDeal}/>}
+      {modal?.type==="deal" && <DealSheet deal={modal.data} pipeline={pipeline} onClose={()=>setModal(null)} onUpdate={updateDeal} onDel={delDeal} stages={pipelineStages(pipeline.id)}/>}
+      {modal?.type==="add"  && <AddSheet  pipeline={pipeline} onClose={()=>setModal(null)} onAdd={addDeal} stages={pipelineStages(pipeline.id)}/>}
+      {modal?.type==="sf"   && <SFSheet   pipeline={pipeline} onClose={()=>setModal(null)} onAdd={addDeal} stages={pipelineStages(pipeline.id)}/>}
     </div>
   );
 }
