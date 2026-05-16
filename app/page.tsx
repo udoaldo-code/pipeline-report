@@ -865,6 +865,9 @@ export default function Page() {
   const [modal,  setModal]  = useState<ModalState>(null);
   const [page,   setPage]   = useState("pipeline");
 
+  const [jiraStages, setJiraStages] = useState<{sales: string[] | null; project: string[] | null}>({sales: null, project: null});
+  const [sync, setSync] = useState<{at: string | null; ok: boolean; loading: boolean; error: string | null}>({at: null, ok: false, loading: true, error: null});
+
   const [fPipe,  setFPipe]  = useState("all");
   const [fStage, setFStage] = useState("all");
   const [fOwner, setFOwner] = useState("all");
@@ -884,6 +887,29 @@ export default function Page() {
     }));
   };
   const delDeal = (id: string) => { setDeals(p=>p.filter(d=>d.id!==id)); setModal(null); };
+
+  const fetchJira = async (force = false) => {
+    setSync(s => ({...s, loading: true}));
+    try {
+      const r = await fetch(`/api/jira/deals${force ? "?refresh=1" : ""}`, {cache: "no-store"});
+      const j = await r.json();
+      if (j.ok) {
+        setDeals(j.deals as Deal[]);
+        setJiraStages({sales: j.salesStages, project: j.projectStages});
+        setSync({at: j.syncedAt, ok: true, loading: false, error: null});
+      } else {
+        setSync({at: null, ok: false, loading: false, error: j.error || "fetch failed"});
+      }
+    } catch (e) {
+      setSync({at: null, ok: false, loading: false, error: (e as Error).message});
+    }
+  };
+
+  useEffect(() => {
+    fetchJira();
+    const id = setInterval(() => fetchJira(), 30 * 60 * 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const pipeline   = PIPES.find(p=>p.id===pipe)!;
   const owners     = [...new Set(deals.map(d=>d.owner).filter(Boolean))];
