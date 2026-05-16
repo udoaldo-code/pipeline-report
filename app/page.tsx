@@ -856,6 +856,37 @@ function SFSheet({pipeline, onClose, onAdd, stages}: { pipeline: Pipeline; onClo
 }
 
 /* ════════════════════════════════════════════
+   JIRA SYNC PILL
+════════════════════════════════════════════ */
+function JiraSyncPill({sync, onRefresh}: {
+  sync: {at: string | null; ok: boolean; loading: boolean; error: string | null};
+  onRefresh: () => void;
+}) {
+  const timeLabel = sync.at
+    ? new Date(sync.at).toLocaleTimeString("en-US", {hour: "2-digit", minute: "2-digit", hour12: false})
+    : "—";
+  const bg = sync.ok ? C.tealLt : sync.error ? "#FEE2E2" : "#F1F5F9";
+  const fg = sync.ok ? "#0E7862" : sync.error ? "#B91C1C" : C.inkSub;
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:8}}>
+      <button onClick={onRefresh} className="btn btn-ghost"
+        disabled={sync.loading}
+        style={{padding:"5px 10px",fontSize:11,fontWeight:700,opacity:sync.loading?.5:1,cursor:sync.loading?"default":"pointer"}}>
+        {sync.loading ? "⏳ Syncing…" : "🔄 Refresh"}
+      </button>
+      <span style={{
+        fontFamily:"'JetBrains Mono',monospace",fontSize:10,fontWeight:700,
+        padding:"3px 8px",borderRadius:5,background:bg,color:fg,whiteSpace:"nowrap",
+      }} title={sync.error ?? ""}>
+        {sync.ok    ? `Synced ${timeLabel} · Jira` :
+         sync.error ? `⚠ Offline (SEED fallback)`  :
+                      `Loading…`}
+      </span>
+    </div>
+  );
+}
+
+/* ════════════════════════════════════════════
    APP ROOT
 ════════════════════════════════════════════ */
 export default function Page() {
@@ -950,6 +981,8 @@ export default function Page() {
               <div style={{width:32,height:32,borderRadius:"50%",background:`linear-gradient(135deg,${C.teal},#1B6FC8)`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:700,color:"#fff"}}>A</div>
               <span style={{fontSize:13,fontWeight:700,color:C.teal}}>Aldo bangsawan</span>
             </div>
+            <div style={{width:1,height:24,background:C.border,margin:"0 8px"}}/>
+            <JiraSyncPill sync={sync} onRefresh={()=>fetchJira(true)}/>
             <div style={{width:1,height:24,background:C.border,margin:"0 8px"}}/>
             <Clock/>
           </header>
