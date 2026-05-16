@@ -68,3 +68,70 @@ async function jiraGet<T>(path: string): Promise<T> {
   }
   return res.json() as Promise<T>;
 }
+
+const PRIORITY_MAP: Record<string, string> = {
+  Highest: "Critical",
+  High: "High",
+  Medium: "Medium",
+  Low: "Low",
+  Lowest: "Low",
+};
+const mapPriority = (p: string | null | undefined): string =>
+  (p && PRIORITY_MAP[p]) || "Medium";
+
+const dateOnly = (iso: string): string => iso.slice(0, 10);
+
+export async function fetchProjectStatuses(projectKey: string, issuetypeName: string): Promise<string[]> {
+  const groups = await jiraGet<JiraStatusGroup[]>(`/rest/api/3/project/${projectKey}/statuses`);
+  const g = groups.find(x => x.name === issuetypeName);
+  return g ? g.statuses.map(s => s.name) : [];
+}
+
+export async function fetchProjectStatusesUnion(
+  projectKeys: string[],
+  issuetypeName: string,
+): Promise<string[]> {
+  const lists = await Promise.all(projectKeys.map(k => fetchProjectStatuses(k, issuetypeName)));
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const list of lists) for (const s of list) {
+    if (!seen.has(s)) { seen.add(s); out.push(s); }
+  }
+  return out;
+}
+
+export async function searchIssues(jql: string): Promise<JiraIssue[]> {
+  const fields = [
+    "summary", "status", "assignee", "priority",
+    "duedate", "created", "customfield_10015",
+  ].join(",");
+  const all: JiraIssue[] = [];
+  let nextPageToken: string | undefined;
+  do {
+    const q = new URLSearchParams({ jql, fields, maxResults: "100" });
+    if (nextPageToken) q.set("nextPageToken", nextPageToken);
+    const page = await jiraGet<JiraSearchResponse>(`/rest/api/3/search/jql?${q.toString()}`);
+    all.push(...page.issues);
+    nextPageToken = page.isLast ? undefined : page.nextPageToken;
+  } while (nextPageToken);
+  return all;
+}
+
+export function issueToDeal(issue: JiraIssue, pid: "sales" | "project"): Deal {
+  const f = issue.fields;
+  const at = f.customfield_10015 ? dateOnly(f.customfield_10015) : dateOnly(f.created);
+  const deal: Deal = {
+    id: issue.key,
+    pid,
+    name: f.summary || issue.key,
+    owner: f.assignee?.displayName || "",
+    val: 0,
+    stage: f.status?.name || "Unknown",
+    pri: mapPriority(f.priority?.name),
+    notes: "",
+    hist: [],
+    at,
+  };
+  if (f.duedate) deal.dueDate = f.duedate;
+  return deal;
+}
