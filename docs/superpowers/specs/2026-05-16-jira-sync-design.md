@@ -3,7 +3,7 @@ Date: 2026-05-16
 
 ## Summary
 
-Replace static SEED data with live Jira data from one Sales project (BDM) and three Project pipelines (RP, PPOBNEW, GOR). Sync every 30 minutes with manual refresh button. Fall back to SEED on API failure. Replace hardcoded pipeline stage lists with status lists fetched dynamically per project.
+Replace static SEED data with live Jira data from one Sales project (BDM) and three Project pipelines (EP, GOR, RP). Sync every 30 minutes with manual refresh button. Fall back to SEED on API failure. Replace hardcoded pipeline stage lists with status lists fetched dynamically per project.
 
 ---
 
@@ -12,7 +12,7 @@ Replace static SEED data with live Jira data from one Sales project (BDM) and th
 | Pipeline | Jira Project Key | Issue Type |
 |----------|-----------------|------------|
 | Sales (`sales`) | `BDM` | `Customer` |
-| Projects (`project`) | `RP`, `PPOBNEW`, `GOR` | `Epic` |
+| Projects (`project`) | `EP`, `GOR`, `RP` | `Epic` |
 | Partnership (`partnership`) | _(hidden — removed from UI for this iteration)_ | — |
 
 Note: BDM has no Epic issuetype. Customer is the deal entity.
@@ -47,7 +47,7 @@ Replace hardcoded `PIPES[i].stages` with statuses fetched from Jira `/rest/api/3
 
 - **Sales stages:** `BDM` statuses for `Customer` issuetype, in API order
   - Expected: `New`, `Follow-up`, `Proposal`, `Negotiation`, `Contract Sent`, `Closed Won`, `Closed Lost`
-- **Project stages:** union of statuses across `RP`, `PPOBNEW`, `GOR` for `Epic` issuetype, deduplicated, in first-seen order
+- **Project stages:** union of statuses across `EP`, `GOR`, `RP` for `Epic` issuetype, deduplicated, in first-seen order
   - Expected: `To Do`, `In Progress`, `Review`, `Ready To Deploy`, `STG / READY TO DEPLOY`, `Testing QA`, `Ready For Deployment`, `Delay`, `delay`, `On Hold`, `Done`, `Dropped`
 - **Partnership stages:** N/A — pipeline hidden
 
