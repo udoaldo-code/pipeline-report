@@ -112,7 +112,7 @@ export async function searchIssues(jql: string): Promise<JiraIssue[]> {
     if (nextPageToken) q.set("nextPageToken", nextPageToken);
     const page = await jiraGet<JiraSearchResponse>(`/rest/api/3/search/jql?${q.toString()}`);
     all.push(...page.issues);
-    nextPageToken = page.isLast ? undefined : page.nextPageToken;
+    nextPageToken = !page.isLast && page.nextPageToken ? page.nextPageToken : undefined;
   } while (nextPageToken);
   return all;
 }
