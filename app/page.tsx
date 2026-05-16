@@ -52,6 +52,8 @@ const PIPES = [
     stages:["Backlog","In Discovery","In Development","UAT","Live","On Hold"] },
 ];
 
+const VISIBLE_PIPES = PIPES.filter(p => p.id !== "partnership");
+
 const PRI: Record<string, { fg: string; bg: string; bd: string }> = {
   Critical: { fg:"#B91C1C", bg:"#FEE2E2", bd:"#FCA5A5" },
   High:     { fg:"#B45309", bg:"#FEF3C7", bd:"#FCD34D" },
@@ -857,7 +859,7 @@ function SFSheet({pipeline, onClose, onAdd}: { pipeline: Pipeline; onClose: () =
    APP ROOT
 ════════════════════════════════════════════ */
 export default function Page() {
-  const [deals,  setDeals]  = useState<Deal[]>(SEED);
+  const [deals,  setDeals]  = useState<Deal[]>(SEED.filter(d => d.pid !== "partnership"));
   const [pipe,   setPipe]   = useState("sales");
   const [view,   setView]   = useState("report");
   const [modal,  setModal]  = useState<ModalState>(null);
@@ -946,7 +948,7 @@ export default function Page() {
                   <div style={lblSt}>Pipeline</div>
                   <select className="filter-select" value={fPipe} onChange={e=>{setFPipe(e.target.value); if(e.target.value!=="all") setPipe(e.target.value);}}>
                     <option value="all">All Pipelines</option>
-                    {PIPES.map(p=><option key={p.id} value={p.id}>{p.emoji} {p.label}</option>)}
+                    {VISIBLE_PIPES.map(p=><option key={p.id} value={p.id}>{p.emoji} {p.label}</option>)}
                   </select>
                 </div>
                 <div>
@@ -1040,7 +1042,7 @@ export default function Page() {
             {/* Pipeline Tabs */}
             <div className="card" style={{marginBottom:0,borderRadius:"10px 10px 0 0",borderBottom:"none"}}>
               <div style={{display:"flex",borderBottom:`1px solid ${C.border}`,overflowX:"auto"}}>
-                {PIPES.map(p=>{
+                {VISIBLE_PIPES.map(p=>{
                   const cnt = deals.filter(d=>d.pid===p.id).length, act = pipe===p.id;
                   return (
                     <button key={p.id} onClick={()=>setPipe(p.id)} className={`pipe-tab btn${act?" active":""}`}
