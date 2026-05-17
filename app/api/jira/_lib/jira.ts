@@ -179,3 +179,65 @@ export async function fetchProjectMeta(key: string): Promise<{ key: string; name
   const data = await jiraGet<{ key: string; name: string }>(`/rest/api/3/project/${key}`);
   return { key: data.key, name: data.name };
 }
+
+type ChangelogItem = { field: string; fromString: string | null; toString: string | null };
+type ChangelogEntry = { created: string; items: ChangelogItem[] };
+
+export type IssueWithChangelog = {
+  key: string;
+  fields: {
+    summary: string;
+    status: { name: string };
+    issuetype: { name: string };
+    duedate: string | null;
+    customfield_10015: string | null;
+    parent: { key: string } | null;
+  };
+  changelog: { histories: ChangelogEntry[] };
+};
+
+export async function searchIssuesWithChangelog(jql: string): Promise<IssueWithChangelog[]> {
+  const fields = ["summary", "status", "issuetype", "duedate", "customfield_10015", "parent"].join(",");
+  const all: IssueWithChangelog[] = [];
+  let nextPageToken: string | undefined;
+  do {
+    const q = new URLSearchParams({ jql, fields, expand: "changelog", maxResults: "100" });
+    if (nextPageToken) q.set("nextPageToken", nextPageToken);
+    const page = await jiraGet<{ issues: IssueWithChangelog[]; nextPageToken?: string; isLast: boolean }>(
+      `/rest/api/3/search/jql?${q.toString()}`,
+    );
+    all.push(...page.issues);
+    nextPageToken = !page.isLast && page.nextPageToken ? page.nextPageToken : undefined;
+  } while (nextPageToken);
+  return all;
+}
+
+export function extractOriginalDueDate(
+  current: string | null,
+  changelog: { histories: ChangelogEntry[] },
+): string | null {
+  if (!current) return null;
+  // Find first history entry where duedate was set (or changed).
+  // Earliest non-null `toString` that differs from current means a revision occurred.
+  const dueChanges: { created: string; toString: string | null; fromString: string | null }[] = [];
+  for (const h of changelog.histories) {
+    for (const it of h.items) {
+      if (it.field === "duedate") {
+        dueChanges.push({ created: h.created, toString: it.toString, fromString: it.fromString });
+      }
+    }
+  }
+  if (dueChanges.length === 0) return null;
+  // sort ascending by created
+  dueChanges.sort((a, b) => a.created.localeCompare(b.created));
+  // earliest assigned date is first toString (or fromString of earliest if it started non-null)
+  const earliest = dueChanges[0];
+  // pick first non-null assignment from the timeline
+  const original = earliest.fromString
+    ? earliest.fromString.slice(0, 10)
+    : earliest.toString
+    ? earliest.toString.slice(0, 10)
+    : null;
+  if (!original || original === current) return null;
+  return original;
+}
