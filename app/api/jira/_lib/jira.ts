@@ -135,3 +135,47 @@ export function issueToDeal(issue: JiraIssue, pid: "sales" | "project"): Deal {
   if (f.duedate) deal.dueDate = f.duedate;
   return deal;
 }
+
+/* ──────────────────────────────────────────────
+   GANTT TREE — types, project meta, changelog
+   ────────────────────────────────────────────── */
+
+export type TreeKind = "project" | "epic" | "task" | "subtask" | "customer";
+
+export type TreeNode = {
+  id: string;
+  kind: TreeKind;
+  name: string;
+  projectKey: string;
+  status: string;
+  startDate: string | null;
+  dueDate: string | null;
+  originalDueDate: string | null;
+  isOverdue: boolean;
+  parentId: string | null;
+  children: TreeNode[];
+};
+
+export type ProjectMeta = {
+  key: string;
+  name: string;
+  color: string;
+  totalEpics: number;
+  doneEpics: number;
+};
+
+export type TreeBundle = {
+  projects: ProjectMeta[];
+  tree: TreeNode[];
+};
+
+const PROJECT_PALETTE = ["#22C55E", "#F59E0B", "#3B82F6", "#A855F7", "#EF4444", "#10B981"];
+
+const DONE_STATUSES = new Set([
+  "Done", "Closed Won", "Closed Lost", "Live", "Signed", "Dropped", "Inactive",
+]);
+
+export async function fetchProjectMeta(key: string): Promise<{ key: string; name: string }> {
+  const data = await jiraGet<{ key: string; name: string }>(`/rest/api/3/project/${key}`);
+  return { key: data.key, name: data.name };
+}
