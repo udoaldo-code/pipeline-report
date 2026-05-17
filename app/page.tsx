@@ -898,6 +898,22 @@ export default function Page() {
 
   const [jiraStages, setJiraStages] = useState<{sales: string[] | null; project: string[] | null}>({sales: null, project: null});
   const [sync, setSync] = useState<{at: string | null; ok: boolean; loading: boolean; error: string | null}>({at: null, ok: false, loading: true, error: null});
+  type TreeNodeC = {
+    id: string;
+    kind: "project" | "epic" | "task" | "subtask" | "customer";
+    name: string;
+    projectKey: string;
+    status: string;
+    startDate: string | null;
+    dueDate: string | null;
+    originalDueDate: string | null;
+    isOverdue: boolean;
+    parentId: string | null;
+    children: TreeNodeC[];
+  };
+  type ProjectMetaC = { key: string; name: string; color: string; totalEpics: number; doneEpics: number };
+  type TreeBundleC = { projects: ProjectMetaC[]; tree: TreeNodeC[] };
+  const [treeData, setTreeData] = useState<{sales: TreeBundleC | null; project: TreeBundleC | null}>({sales: null, project: null});
 
   const pipelineStages = (pid: string): string[] => {
     if (pid === "sales"   && jiraStages.sales)   return jiraStages.sales;
@@ -928,14 +944,22 @@ export default function Page() {
   const fetchJira = async (force = false) => {
     setSync(s => ({...s, loading: true}));
     try {
-      const r = await fetch(`/api/jira/deals${force ? "?refresh=1" : ""}`, {cache: "no-store"});
-      const j = await r.json();
-      if (j.ok) {
-        setDeals(j.deals as Deal[]);
-        setJiraStages({sales: j.salesStages, project: j.projectStages});
-        setSync({at: j.syncedAt, ok: true, loading: false, error: null});
+      const qs = force ? "?refresh=1" : "";
+      const [dr, tr] = await Promise.all([
+        fetch(`/api/jira/deals${qs}`,  {cache: "no-store"}).then(r => r.json()),
+        fetch(`/api/jira/tree${qs}`,   {cache: "no-store"}).then(r => r.json()),
+      ]);
+      if (dr.ok) {
+        setDeals(dr.deals as Deal[]);
+        setJiraStages({sales: dr.salesStages, project: dr.projectStages});
+      }
+      if (tr.ok) {
+        setTreeData({sales: tr.sales, project: tr.project});
+      }
+      if (dr.ok || tr.ok) {
+        setSync({at: dr.syncedAt || tr.syncedAt, ok: true, loading: false, error: null});
       } else {
-        setSync({at: null, ok: false, loading: false, error: j.error || "fetch failed"});
+        setSync({at: null, ok: false, loading: false, error: dr.error || tr.error || "fetch failed"});
       }
     } catch (e) {
       setSync({at: null, ok: false, loading: false, error: (e as Error).message});
