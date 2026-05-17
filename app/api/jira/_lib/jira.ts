@@ -241,3 +241,117 @@ export function extractOriginalDueDate(
   if (!original || original === current) return null;
   return original;
 }
+
+function kindFromIssueType(issuetype: string): TreeKind {
+  const t = issuetype.toLowerCase();
+  if (t === "customer") return "customer";
+  if (t === "epic")     return "epic";
+  if (t === "sub-task" || t === "subtask") return "subtask";
+  // Task and Story both rendered as task layer
+  return "task";
+}
+
+function buildNode(i: IssueWithChangelog, today: string): TreeNode {
+  const status   = i.fields.status?.name ?? "Unknown";
+  const dueDate  = i.fields.duedate;
+  const overdue  = !!dueDate && dueDate < today && !DONE_STATUSES.has(status);
+  return {
+    id: i.key,
+    kind: kindFromIssueType(i.fields.issuetype.name),
+    name: i.fields.summary || i.key,
+    projectKey: i.key.split("-")[0],
+    status,
+    startDate: i.fields.customfield_10015 ? i.fields.customfield_10015.slice(0, 10) : null,
+    dueDate,
+    originalDueDate: extractOriginalDueDate(dueDate, i.changelog),
+    isOverdue: overdue,
+    parentId: i.fields.parent?.key ?? null,
+    children: [],
+  };
+}
+
+function buildProjectTree(
+  projectMetas: Map<string, { key: string; name: string }>,
+  issues: IssueWithChangelog[],
+  paletteOffset: number,
+  isCustomerFlat: boolean,
+): TreeBundle {
+  const today = new Date().toISOString().slice(0, 10);
+  const allNodes = issues.map(i => buildNode(i, today));
+
+  // Index by id
+  const byId = new Map<string, TreeNode>();
+  for (const n of allNodes) byId.set(n.id, n);
+
+  // Link parents
+  const orphans: TreeNode[] = [];
+  for (const n of allNodes) {
+    if (n.parentId && byId.has(n.parentId)) {
+      byId.get(n.parentId)!.children.push(n);
+    } else {
+      orphans.push(n);
+    }
+  }
+
+  // Group orphans by projectKey
+  const byProject = new Map<string, TreeNode[]>();
+  for (const n of orphans) {
+    const list = byProject.get(n.projectKey) ?? [];
+    list.push(n);
+    byProject.set(n.projectKey, list);
+  }
+
+  // Build project headers
+  const projects: ProjectMeta[] = [];
+  const tree: TreeNode[] = [];
+  let pi = 0;
+  for (const [pk, meta] of projectMetas) {
+    const top = byProject.get(pk) ?? [];
+    const epics = top.filter(n => n.kind === "epic");
+    const doneEpics = epics.filter(n => DONE_STATUSES.has(n.status)).length;
+    const color = PROJECT_PALETTE[(paletteOffset + pi) % PROJECT_PALETTE.length];
+    projects.push({
+      key: pk,
+      name: meta.name,
+      color,
+      totalEpics: isCustomerFlat ? top.length : epics.length,
+      doneEpics: isCustomerFlat ? top.filter(n => DONE_STATUSES.has(n.status)).length : doneEpics,
+    });
+    const projectNode: TreeNode = {
+      id: `proj:${pk}`,
+      kind: "project",
+      name: meta.name,
+      projectKey: pk,
+      status: "",
+      startDate: null,
+      dueDate: null,
+      originalDueDate: null,
+      isOverdue: false,
+      parentId: null,
+      children: top,
+    };
+    tree.push(projectNode);
+    pi++;
+  }
+
+  return { projects, tree };
+}
+
+export async function fetchTree(): Promise<{ sales: TreeBundle; project: TreeBundle }> {
+  const [bdmMeta, epMeta, gorMeta, rpMeta, bdmIssues, projectIssues] = await Promise.all([
+    fetchProjectMeta("BDM"),
+    fetchProjectMeta("EP"),
+    fetchProjectMeta("GOR"),
+    fetchProjectMeta("RP"),
+    searchIssuesWithChangelog('project = BDM AND issuetype = Customer'),
+    searchIssuesWithChangelog('project IN (EP, GOR, RP) AND issuetype IN (Epic, Task, Subtask, "Sub-task", Story)'),
+  ]);
+  const sales = buildProjectTree(new Map([["BDM", bdmMeta]]), bdmIssues, 0, true);
+  const project = buildProjectTree(
+    new Map([["EP", epMeta], ["GOR", gorMeta], ["RP", rpMeta]]),
+    projectIssues,
+    1, // offset so project palette starts at a different color than sales
+    false,
+  );
+  return { sales, project };
+}
