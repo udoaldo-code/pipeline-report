@@ -464,200 +464,105 @@ function HistoryView({ pipeline, deals }: { pipeline: Pipeline; deals: Deal[] })
 }
 
 /* ════════════════════════════════════════════
-   GANTT VIEW
+   GANTT TREE VIEW
 ════════════════════════════════════════════ */
-function GanttView({ pipeline, deals }: { pipeline: Pipeline; deals: Deal[] }) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
-  const today = new Date(); today.setHours(0,0,0,0);
+const STATUS_COLORS_TREE: Record<string, string> = {
+  "Done": "#22C55E",
+  "Closed Won": "#22C55E",
+  "Live": "#22C55E",
+  "Signed": "#22C55E",
+  "In Progress": "#3B82F6",
+  "To Do": "#6B82A4",
+  "Delay": "#EF4444",
+  "delay": "#EF4444",
+  "On Hold": "#F59E0B",
+  "Review": "#A855F7",
+  "Testing QA": "#A855F7",
+  "Ready For Deployment": "#10B981",
+  "Ready To Deploy": "#10B981",
+  "STG / READY TO DEPLOY": "#10B981",
+  "Dropped": "#64748B",
+  "Closed Lost": "#64748B",
+  "Inactive": "#64748B",
+  "Proposal": "#F59E0B",
+  "Negotiation": "#3B82F6",
+  "Follow-up": "#A855F7",
+  "Contract Sent": "#10B981",
+  "New": "#6B82A4",
+};
+const TREE_FALLBACK_COLOR = "#A3B5CC";
+const treeColor = (s: string): string => STATUS_COLORS_TREE[s] ?? TREE_FALLBACK_COLOR;
 
-  if (deals.length === 0) return <EmptyState msg="No deals in this pipeline yet." />;
+const DONE_STATUSES_C = new Set([
+  "Done", "Closed Won", "Closed Lost", "Live", "Signed", "Dropped", "Inactive",
+]);
+const TERMINAL_STATUSES_C = new Set([
+  ...DONE_STATUSES_C, "On Hold",
+]);
 
-  const tStart = new Date(Math.min(...deals.map(d => new Date(d.at).getTime())));
-  const fallback = new Date(today); fallback.setDate(today.getDate() + 28);
-  const dueTimes = deals.filter(d => d.dueDate).map(d => new Date(d.dueDate!).getTime());
-  const tEnd = new Date(Math.max(fallback.getTime(), ...dueTimes));
+type TreeNodeC2 = {
+  id: string;
+  kind: "project" | "epic" | "task" | "subtask" | "customer";
+  name: string;
+  projectKey: string;
+  status: string;
+  startDate: string | null;
+  dueDate: string | null;
+  originalDueDate: string | null;
+  isOverdue: boolean;
+  parentId: string | null;
+  children: TreeNodeC2[];
+};
+type ProjectMetaC2 = { key: string; name: string; color: string; totalEpics: number; doneEpics: number };
+type TreeBundleC2 = { projects: ProjectMetaC2[]; tree: TreeNodeC2[] };
 
-  // Build weekly column headers (Monday of each week)
-  const weeks: Date[] = [];
-  const cur = new Date(tStart); cur.setDate(cur.getDate() - ((cur.getDay() + 6) % 7));
-  while (cur <= tEnd) { weeks.push(new Date(cur)); cur.setDate(cur.getDate() + 7); }
+const STATUS_CHIPS = ["All", "Active", "Delay", "Done", "In Progress", "To Do"] as const;
+type StatusChip = typeof STATUS_CHIPS[number];
 
-  const pct   = (d: Date) => dateToPercent(d, tStart, tEnd);
-  const todayPct = pct(today);
-  const LABEL_W = 190;
+function matchesChip(status: string, chip: StatusChip): boolean {
+  if (chip === "All") return true;
+  if (chip === "Active") return !TERMINAL_STATUSES_C.has(status);
+  if (chip === "Delay") return status === "Delay" || status === "delay";
+  if (chip === "Done") return DONE_STATUSES_C.has(status);
+  if (chip === "In Progress") return status === "In Progress";
+  if (chip === "To Do") return status === "To Do";
+  return false;
+}
 
-  const toggle = (id: string) =>
-    setCollapsed(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
-
-  const getVariance = (due: string) => {
-    const diff = Math.round((new Date(due).getTime() - today.getTime()) / 86400000);
-    const wks  = Math.round(Math.abs(diff) / 7);
-    if (diff < -1) return { label:`+${wks}wk behind`, fg:"#B91C1C", bg:"#FEE2E2" };
-    if (diff > 7)  return { label:`${wks}wk ahead`,   fg:"#0E7862", bg:"#D1FAE5" };
-    return             { label:"on track",             fg:"#0E7862", bg:C.tealLt  };
+function countByChip(nodes: TreeNodeC2[], chip: StatusChip): number {
+  let c = 0;
+  const walk = (n: TreeNodeC2) => {
+    if (n.kind !== "project" && matchesChip(n.status, chip)) c++;
+    for (const ch of n.children) walk(ch);
   };
+  for (const n of nodes) walk(n);
+  return c;
+}
 
-  // Shared grid overlay for a track cell
-  const TrackGrid = () => (
-    <div style={{position:"absolute",inset:0,display:"flex",pointerEvents:"none"}}>
-      {weeks.map((wd,i) => (
-        <div key={i} style={{
-          flex:1, borderRight:`1px dashed ${wd > today ? "#E2E8F0" : C.border}`,
-          background: wd > today ? "rgba(107,130,164,.03)" : "transparent",
-        }}/>
-      ))}
-    </div>
-  );
+// Earliest startDate and latest dueDate across descendants
+function projectSpan(node: TreeNodeC2): { start: string | null; end: string | null } {
+  let start: string | null = null;
+  let end:   string | null = null;
+  const walk = (n: TreeNodeC2) => {
+    if (n.startDate && (!start || n.startDate < start)) start = n.startDate;
+    if (n.dueDate   && (!end   || n.dueDate   > end))   end   = n.dueDate;
+    for (const c of n.children) walk(c);
+  };
+  for (const c of node.children) walk(c);
+  return { start, end };
+}
 
-  // Red today line for a track cell
-  const TodayLine = () => (
-    <div style={{position:"absolute",top:0,bottom:0,width:2,left:`${todayPct}%`,background:C.red,borderRadius:1,zIndex:20,pointerEvents:"none"}}/>
-  );
-
+function GanttTreeView({ bundle }: { bundle: TreeBundleC2 | null }) {
+  const [chip, setChip] = useState<StatusChip>("All");
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    // Default: project rows expanded; epic rows collapsed (so tasks hidden initially).
+    return new Set();
+  });
+  if (!bundle) return <EmptyState msg="Loading Jira tree…"/>;
   return (
-    <div style={{padding:16,overflowX:"auto",minWidth:500}}>
-
-      {/* Column headers */}
-      <div style={{display:"flex",marginBottom:8,alignItems:"flex-end"}}>
-        <div style={{width:LABEL_W,flexShrink:0,fontSize:10,fontWeight:700,color:C.inkDim,textTransform:"uppercase",letterSpacing:".07em",paddingBottom:4}}>
-          Project / Stage
-        </div>
-        <div style={{flex:1,position:"relative",borderLeft:`1px solid ${C.border}`}}>
-          <div style={{display:"flex"}}>
-            {weeks.map((wd,i) => {
-              const near = Math.abs(wd.getTime() - today.getTime()) < 7*86400000;
-              return (
-                <div key={i} style={{
-                  flex:1,fontSize:9,fontWeight:700,textAlign:"center",
-                  color:near ? C.red : C.inkDim,fontFamily:"'JetBrains Mono',monospace",
-                  borderRight:`1px dashed ${wd > today ? "#E2E8F0" : C.border}`,
-                  background:wd > today ? "#F5F8FC" : "transparent",paddingBottom:4,
-                }}>
-                  {week(wd).split("-")[1]}<br/>
-                  <span style={{fontWeight:400,opacity:.7}}>
-                    {wd.toLocaleDateString("en-US",{month:"short",day:"numeric"})}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-          {/* Today line + badge in header */}
-          <div style={{position:"absolute",top:0,bottom:0,width:2,left:`${todayPct}%`,background:C.red,borderRadius:1,zIndex:20}}>
-            <div style={{position:"absolute",bottom:"calc(100% + 2px)",left:"50%",transform:"translateX(-50%)",background:C.red,color:"#fff",fontSize:8,fontWeight:700,padding:"2px 5px",borderRadius:3,whiteSpace:"nowrap"}}>
-              Today
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Deal rows */}
-      {deals.map(deal => {
-        const isCollapsed = collapsed.has(deal.id);
-        const dealStart   = new Date(deal.at);
-        const isClosed    = ["Closed Lost","Inactive","On Hold","Live","Closed Won","Signed"].includes(deal.stage);
-        const actualEnd   = isClosed ? new Date(deal.hist[deal.hist.length-1].ts) : today;
-        const aLeft       = pct(dealStart);
-        const aWidth      = Math.max(0, Math.min(pct(actualEnd) - aLeft, 100 - aLeft));
-        const duePct      = deal.dueDate ? pct(new Date(deal.dueDate)) : null;
-        const gWidth      = duePct !== null ? Math.max(0, duePct - aLeft) : null;
-        const v           = deal.dueDate ? getVariance(deal.dueDate) : null;
-
-        return (
-          <React.Fragment key={deal.id}>
-
-            {/* Parent row */}
-            <div style={{display:"flex",alignItems:"center",marginBottom:3}}>
-              <div style={{width:LABEL_W,flexShrink:0,paddingRight:8}}>
-                <div style={{display:"flex",alignItems:"center",gap:5,marginBottom:3}}>
-                  <span onClick={()=>toggle(deal.id)}
-                    style={{cursor:"pointer",fontSize:11,color:C.inkSub,userSelect:"none",flexShrink:0}}>
-                    {isCollapsed ? "▸" : "▾"}
-                  </span>
-                  <span style={{fontSize:12,fontWeight:700,color:C.ink,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
-                    {deal.name}
-                  </span>
-                </div>
-                <div style={{display:"flex",alignItems:"center",gap:4,paddingLeft:16,flexWrap:"wrap"}}>
-                  <PriBadge p={deal.pri}/>
-                  {v && (
-                    <span style={{fontSize:9,fontWeight:700,padding:"1px 6px",borderRadius:3,background:v.bg,color:v.fg,whiteSpace:"nowrap"}}>
-                      {v.label}
-                    </span>
-                  )}
-                  {!deal.dueDate && (
-                    <span style={{fontSize:9,color:C.teal,fontWeight:700,cursor:"pointer"}}>✏ due date</span>
-                  )}
-                </div>
-              </div>
-              <div style={{flex:1,height:36,position:"relative",borderLeft:`1px solid ${C.border}`}}>
-                <TrackGrid/>
-                {/* Ghost planned bar */}
-                {gWidth !== null && gWidth > 0 && (
-                  <div style={{position:"absolute",top:8,height:20,left:`${aLeft}%`,width:`${gWidth}%`,border:"2px dashed #A3B5CC",borderRadius:4,background:"transparent",boxSizing:"border-box"}}/>
-                )}
-                {/* Actual bar */}
-                {aWidth > 0 && (
-                  <div style={{position:"absolute",top:8,height:20,left:`${aLeft}%`,width:`${aWidth}%`,background:`linear-gradient(90deg,${pipeline.color},${pipeline.color}cc)`,borderRadius:4,display:"flex",alignItems:"center",padding:"0 7px",fontSize:9,fontWeight:700,color:"#fff",overflow:"hidden",whiteSpace:"nowrap",boxShadow:"0 1px 4px rgba(0,0,0,.12)"}}>
-                    {deal.stage}
-                  </div>
-                )}
-                {/* Due date diamond */}
-                {duePct !== null && (
-                  <div style={{position:"absolute",top:"50%",left:`${duePct}%`,transform:"translate(-50%,-50%)",zIndex:15}}>
-                    <div style={{position:"relative",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                      <div style={{position:"absolute",bottom:"calc(100% + 3px)",left:"50%",transform:"translateX(-50%)",fontSize:8,fontWeight:700,color:C.inkSub,background:"#fff",padding:"1px 4px",borderRadius:3,border:`1px solid ${C.border}`,whiteSpace:"nowrap"}}>
-                        {week(new Date(deal.dueDate!))}
-                      </div>
-                      <div style={{width:10,height:10,transform:"rotate(45deg)",background:"#6B82A4",border:"2px solid #fff",boxShadow:"0 1px 3px rgba(0,0,0,.2)"}}/>
-                    </div>
-                  </div>
-                )}
-                <TodayLine/>
-              </div>
-            </div>
-
-            {/* Stage sub-rows (shown when not collapsed) */}
-            {!isCollapsed && deal.hist.map((h, i) => {
-              const sStart = new Date(h.ts);
-              const sEnd   = i < deal.hist.length-1 ? new Date(deal.hist[i+1].ts) : today;
-              const sLeft  = pct(sStart);
-              const sWidth = Math.max(0, Math.min(pct(sEnd) - sLeft, 100 - sLeft));
-              const sc     = stageColor(h.stage);
-              const isLast = i === deal.hist.length - 1;
-              return (
-                <div key={`${deal.id}-s${i}`} style={{display:"flex",alignItems:"center",marginBottom:isLast ? 10 : 3}}>
-                  <div style={{width:LABEL_W,flexShrink:0,paddingRight:8,textAlign:"right"}}>
-                    <span style={{fontSize:10,color:C.inkSub}}>{h.stage}</span>
-                  </div>
-                  <div style={{flex:1,height:20,position:"relative",borderLeft:`1px solid ${C.border}`}}>
-                    <TrackGrid/>
-                    {sWidth > 0 && (
-                      <div style={{position:"absolute",top:4,height:12,left:`${sLeft}%`,width:`${sWidth}%`,background:sc,borderRadius:3,display:"flex",alignItems:"center",padding:"0 5px",fontSize:8,fontWeight:700,color:"#fff",overflow:"hidden",whiteSpace:"nowrap"}}>
-                        {h.stage}{isLast ? " ▌" : ""}
-                      </div>
-                    )}
-                    <TodayLine/>
-                  </div>
-                </div>
-              );
-            })}
-
-          </React.Fragment>
-        );
-      })}
-
-      {/* Legend */}
-      <div style={{display:"flex",gap:14,flexWrap:"wrap",borderTop:`1px solid ${C.border}`,paddingTop:10,marginTop:6,fontSize:11,color:C.inkSub}}>
-        {([
-          [<div key="p" style={{width:18,height:8,border:"2px dashed #A3B5CC",borderRadius:2}}/>, "Planned"],
-          [<div key="a" style={{width:18,height:8,borderRadius:2,background:pipeline.color}}/>,  "Actual"],
-          [<div key="d" style={{width:9,height:9,transform:"rotate(45deg)",background:"#6B82A4",border:"2px solid #fff",boxShadow:"0 1px 2px rgba(0,0,0,.2)"}}/>, "Due date"],
-          [<div key="t" style={{width:2,height:14,background:C.red,borderRadius:1}}/>,           "Today"],
-        ] as [React.ReactNode, string][]).map(([el,lbl]) => (
-          <div key={lbl} style={{display:"flex",alignItems:"center",gap:6}}>{el} {lbl}</div>
-        ))}
-      </div>
+    <div style={{padding:14}}>
+      <div style={{fontSize:13,color:C.inkMid}}>Status chips, headers, rows — implementation in next task. {bundle.tree.length} project(s) loaded.</div>
     </div>
   );
 }
@@ -1158,7 +1063,7 @@ export default function Page() {
               {view==="report"  && <ReportView  pipeline={pipeline} deals={pDeals} filtered={filtered} fPipe={fPipe} onOpen={d=>setModal({type:"deal",data:d})}/>}
               {view==="board"   && <BoardView   pipeline={pipeline} deals={pDeals} onOpen={d=>setModal({type:"deal",data:d})} stages={pipelineStages(pipeline.id)}/>}
               {view==="history" && <HistoryView pipeline={pipeline} deals={pDeals}/>}
-              {view==="gantt"   && <GanttView   pipeline={pipeline} deals={pDeals}/>}
+              {view==="gantt"   && <GanttTreeView bundle={pipeline.id === "sales" ? treeData.sales : pipeline.id === "project" ? treeData.project : null}/>}
             </div>
 
           </main>
