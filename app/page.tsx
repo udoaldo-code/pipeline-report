@@ -564,6 +564,86 @@ function projectSpan(node: TreeNodeC2): { start: string | null; end: string | nu
   return { start, end };
 }
 
+function TreeReportView({ bundle }: { bundle: TreeBundleC2 | null }) {
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  if (!bundle) return <EmptyState msg="Loading Jira tree…"/>;
+
+  const toggle = (id: string) =>
+    setCollapsed(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+
+  const kindLabel: Record<TreeNodeC2["kind"], string> = {
+    project: "Project", epic: "Epic", task: "Task", subtask: "Sub-task", customer: "Customer",
+  };
+
+  const renderRow = (n: TreeNodeC2, depth: number): React.ReactNode[] => {
+    const out: React.ReactNode[] = [];
+    const isProj = n.kind === "project";
+    const isCollapsed = collapsed.has(n.id);
+    const expandable = n.children.length > 0;
+    const proj = bundle.projects.find(p => p.key === n.projectKey);
+    const projColor = proj?.color ?? "#94A3B8";
+    const stColor = isProj ? projColor : treeColor(n.status);
+
+    out.push(
+      <tr key={n.id} className="deal-row fu" style={{animationDelay:`${Math.min(depth*15, 200)}ms`,background: isProj ? "#F5F8FC" : undefined}}>
+        <td style={{maxWidth:380}}>
+          <div style={{display:"flex",alignItems:"center",gap:6,paddingLeft: depth*16}}>
+            <div style={{width:3,height:24,borderRadius:2,background:projColor,flexShrink:0}}/>
+            {expandable
+              ? <span onClick={()=>toggle(n.id)} style={{cursor:"pointer",fontSize:11,color:C.inkSub,userSelect:"none",width:14,textAlign:"center"}}>{isCollapsed ? "▸" : "▾"}</span>
+              : <span style={{width:14}}/>}
+            <span style={{
+              fontSize: isProj ? 13 : 12,
+              fontWeight: isProj ? 800 : n.kind === "epic" ? 700 : 500,
+              color: isProj ? projColor : C.ink,
+              overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
+            }}>{n.name}</span>
+            {n.isOverdue && (
+              <span style={{background:C.red,color:"#fff",fontSize:8,fontWeight:700,padding:"2px 5px",borderRadius:3}}>OVR</span>
+            )}
+          </div>
+        </td>
+        <td style={{whiteSpace:"nowrap"}}>
+          {isProj
+            ? <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,fontWeight:700,color:projColor,background:projColor+"22",padding:"2px 7px",borderRadius:3}}>{proj?.key}</span>
+            : <span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:C.inkSub,background:"#F1F5F9",padding:"2px 7px",borderRadius:3,border:`1px solid ${C.border}`}}>{n.id}</span>}
+        </td>
+        <td style={{whiteSpace:"nowrap",fontSize:11,color:C.inkSub}}>{kindLabel[n.kind]}</td>
+        <td style={{whiteSpace:"nowrap"}}>
+          {isProj
+            ? <span style={{fontSize:11,color:C.inkSub}}>{proj?.totalEpics} {n.projectKey === "BDM" ? "leads" : "epics"} · {proj?.doneEpics} done</span>
+            : <span className="stage-pill" style={{background:stColor+"22",color:stColor,border:`1px solid ${stColor}55`}}>{n.status}</span>}
+        </td>
+        <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:n.dueDate ? C.inkMid : C.inkDim,whiteSpace:"nowrap"}}>
+          {n.dueDate ?? "—"}
+        </td>
+      </tr>
+    );
+
+    if (!isCollapsed) {
+      for (const c of n.children) out.push(...renderRow(c, depth + 1));
+    }
+    return out;
+  };
+
+  return (
+    <div style={{overflowX:"auto"}}>
+      <table className="data-table" style={{width:"100%"}}>
+        <thead>
+          <tr>
+            {["Name","Key","Type","Status","Due Date"].map((h,i) => (
+              <th key={i} style={{background:C.ink,fontSize:11,whiteSpace:"nowrap"}}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {bundle.tree.flatMap(n => renderRow(n, 0))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function GanttTreeView({ bundle }: { bundle: TreeBundleC2 | null }) {
   const [chip, setChip] = useState<StatusChip>("All");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -1275,7 +1355,9 @@ export default function Page() {
 
             {/* Deal Content */}
             <div className="card" style={{borderRadius:"0 0 10px 10px",borderTop:"none",overflow:"hidden"}}>
-              {view==="report"  && <ReportView  pipeline={pipeline} deals={pDeals} filtered={filtered} fPipe={fPipe} onOpen={d=>setModal({type:"deal",data:d})}/>}
+              {view==="report"  && pipeline.id === "project"
+                ? <TreeReportView bundle={treeData.project}/>
+                : view==="report" && <ReportView  pipeline={pipeline} deals={pDeals} filtered={filtered} fPipe={fPipe} onOpen={d=>setModal({type:"deal",data:d})}/>}
               {view==="board"   && <BoardView   pipeline={pipeline} deals={pDeals} onOpen={d=>setModal({type:"deal",data:d})} stages={pipelineStages(pipeline.id)}/>}
               {view==="history" && <HistoryView pipeline={pipeline} deals={pDeals}/>}
               {view==="gantt"   && <GanttTreeView bundle={pipeline.id === "sales" ? treeData.sales : pipeline.id === "project" ? treeData.project : null}/>}
