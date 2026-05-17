@@ -670,7 +670,7 @@ function GanttTreeView({ bundle }: { bundle: TreeBundleC2 | null }) {
           {isProj && proj && (
             <div style={{display:"flex",alignItems:"center",gap:6,fontSize:10,color:C.inkSub,marginTop:3,marginLeft:17}}>
               <span style={{background:projColor+"22",color:projColor,padding:"1px 6px",borderRadius:3,fontFamily:"'JetBrains Mono',monospace",fontWeight:700}}>{proj.key}</span>
-              <span>{proj.totalEpics} {n.children.some(c=>c.kind==="customer") ? "customers" : "epics"} · {proj.doneEpics} done</span>
+              <span>{proj.totalEpics} {proj.key === "BDM" ? "leads" : "epics"} · {proj.doneEpics} done</span>
             </div>
           )}
         </div>

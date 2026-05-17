@@ -245,6 +245,7 @@ export function extractOriginalDueDate(
 function kindFromIssueType(issuetype: string): TreeKind {
   const t = issuetype.toLowerCase();
   if (t === "customer") return "customer";
+  if (t === "lead")     return "epic"; // BDM Lead renders as parent group (epic layer)
   if (t === "epic")     return "epic";
   if (t === "sub-task" || t === "subtask") return "subtask";
   // Task and Story both rendered as task layer
@@ -343,10 +344,10 @@ export async function fetchTree(): Promise<{ sales: TreeBundle; project: TreeBun
     fetchProjectMeta("EP"),
     fetchProjectMeta("GOR"),
     fetchProjectMeta("RP"),
-    searchIssuesWithChangelog('project = BDM AND issuetype = Customer'),
+    searchIssuesWithChangelog('project = BDM AND issuetype IN (Lead, Customer)'),
     searchIssuesWithChangelog('project IN (EP, GOR, RP) AND issuetype IN (Epic, Task, Subtask, "Sub-task", Story)'),
   ]);
-  const sales = buildProjectTree(new Map([["BDM", bdmMeta]]), bdmIssues, 0, true);
+  const sales = buildProjectTree(new Map([["BDM", bdmMeta]]), bdmIssues, 0, false);
   const project = buildProjectTree(
     new Map([["EP", epMeta], ["GOR", gorMeta], ["RP", rpMeta]]),
     projectIssues,
