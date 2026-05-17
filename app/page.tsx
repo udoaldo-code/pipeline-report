@@ -614,8 +614,10 @@ function TreeReportView({ bundle }: { bundle: TreeBundleC2 | null }) {
             ? <span style={{fontSize:11,color:C.inkSub}}>{proj?.totalEpics} {n.projectKey === "BDM" ? "leads" : "epics"} · {proj?.doneEpics} done</span>
             : <span className="stage-pill" style={{background:stColor+"22",color:stColor,border:`1px solid ${stColor}55`}}>{n.status}</span>}
         </td>
-        <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:n.dueDate ? C.inkMid : C.inkDim,whiteSpace:"nowrap"}}>
-          {n.dueDate ?? "—"}
+        <td style={{fontFamily:"'JetBrains Mono',monospace",fontSize:11,color:(isProj ? n.children.some(c => c.kind === "epic" && c.dueDate) : !!n.dueDate) ? C.inkMid : C.inkDim,whiteSpace:"nowrap"}}>
+          {isProj
+            ? (n.children.filter(c => c.kind === "epic" && c.dueDate).map(c => c.dueDate!).sort().pop() ?? "—")
+            : (n.dueDate ?? "—")}
         </td>
       </tr>
     );
