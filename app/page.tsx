@@ -555,14 +555,218 @@ function projectSpan(node: TreeNodeC2): { start: string | null; end: string | nu
 
 function GanttTreeView({ bundle }: { bundle: TreeBundleC2 | null }) {
   const [chip, setChip] = useState<StatusChip>("All");
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
-    // Default: project rows expanded; epic rows collapsed (so tasks hidden initially).
-    return new Set();
-  });
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
   if (!bundle) return <EmptyState msg="Loading Jira tree…"/>;
+
+  const year   = new Date().getFullYear();
+  const yStart = new Date(year, 0, 1);
+  const yEnd   = new Date(year, 11, 31);
+  const today  = new Date(); today.setHours(0,0,0,0);
+  const ms     = (d: Date) => d.getTime();
+  const pct    = (d: Date) => Math.min(100, Math.max(0, ((ms(d) - ms(yStart)) / (ms(yEnd) - ms(yStart))) * 100));
+  const todayPct = pct(today);
+
+  const months = Array.from({length:12}, (_,i) => new Date(year, i, 1));
+
+  const LABEL_W = 240;
+
+  const toggle = (id: string) =>
+    setCollapsed(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s; });
+
+  // Bar geometry
+  const barGeom = (start: string | null, end: string | null) => {
+    if (!start || !end) return null;
+    const sd = new Date(start); const ed = new Date(end);
+    if (sd > yEnd || ed < yStart) return null;
+    const left  = pct(sd < yStart ? yStart : sd);
+    const right = pct(ed > yEnd ? yEnd : ed);
+    const width = Math.max(0.5, right - left);
+    return { left, width };
+  };
+
+  const renderBar = (n: TreeNodeC2, height: number) => {
+    const main = barGeom(n.startDate, n.dueDate);
+    const revised = n.originalDueDate ? barGeom(n.startDate, n.originalDueDate) : null;
+    const color = treeColor(n.status);
+    const dateLabel = (n.startDate && n.dueDate)
+      ? `${new Date(n.startDate).toLocaleDateString("en-US",{day:"2-digit",month:"short"})} → ${new Date(n.dueDate).toLocaleDateString("en-US",{day:"2-digit",month:"short"})}`
+      : "";
+    return (
+      <>
+        {revised && main && revised.left !== main.left + main.width && (
+          <div style={{
+            position:"absolute", top: (height - 8) / 2 + height + 2, height: 6,
+            left:`${revised.left}%`, width:`${revised.width}%`,
+            border:`2px dashed ${color}`, borderRadius: 3, background:"transparent",
+          }} title="Original due date"/>
+        )}
+        {main && (
+          <div style={{
+            position:"absolute", top: (height - Math.min(height-4, 18)) / 2,
+            height: Math.min(height-4, 18),
+            left:`${main.left}%`, width:`${main.width}%`,
+            background: color, borderRadius:4, display:"flex", alignItems:"center",
+            padding:"0 7px", fontSize:9, fontWeight:700, color:"#fff",
+            overflow:"hidden", whiteSpace:"nowrap", boxShadow:"0 1px 3px rgba(0,0,0,.15)",
+          }}>{n.name}</div>
+        )}
+        {main && dateLabel && (
+          <div style={{
+            position:"absolute", left:`calc(${main.left + main.width}% + 8px)`,
+            top:"50%", transform:"translateY(-50%)",
+            fontSize:10, color:C.inkSub, whiteSpace:"nowrap", pointerEvents:"none",
+          }}>{n.name} <span style={{opacity:.7}}>{dateLabel}</span></div>
+        )}
+      </>
+    );
+  };
+
+  // Filter walk: returns true if node or any descendant matches chip
+  const nodeMatchesFilter = (n: TreeNodeC2): boolean => {
+    if (n.kind === "project") return n.children.some(nodeMatchesFilter);
+    if (matchesChip(n.status, chip)) return true;
+    return n.children.some(nodeMatchesFilter);
+  };
+
+  // Render one node + children recursively
+  const renderRow = (n: TreeNodeC2, depth: number): React.ReactNode[] => {
+    const isProj = n.kind === "project";
+    const isCollapsed = collapsed.has(n.id);
+    const height = isProj ? 48 : n.kind === "epic" ? 28 : n.kind === "task" ? 24 : 22;
+    const expandable = n.children.length > 0;
+
+    if (!nodeMatchesFilter(n)) return [];
+
+    const proj = bundle.projects.find(p => p.key === n.projectKey);
+    const projColor = proj?.color ?? "#94A3B8";
+
+    const out: React.ReactNode[] = [];
+
+    out.push(
+      <div key={n.id} style={{display:"flex", alignItems:"center", height, borderTop: isProj ? `1px solid ${C.border}` : "none"}}>
+        <div style={{width:LABEL_W, flexShrink:0, paddingLeft: depth*14 + 8, paddingRight:8, display:"flex", flexDirection:"column", justifyContent:"center"}}>
+          <div style={{display:"flex", alignItems:"center", gap:6}}>
+            {expandable && (
+              <span onClick={()=>toggle(n.id)}
+                style={{cursor:"pointer", fontSize:11, color:C.inkSub, userSelect:"none"}}>
+                {isCollapsed ? "▸" : "▾"}
+              </span>
+            )}
+            {!expandable && <span style={{width:11}}/>}
+            <span style={{
+              fontSize: isProj ? 13 : 11,
+              fontWeight: isProj ? 800 : n.kind === "epic" ? 700 : 500,
+              color: isProj ? projColor : C.ink,
+              overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap",
+            }}>
+              {!isProj && <span style={{fontFamily:"'JetBrains Mono',monospace",color:C.inkDim,marginRight:6}}>{n.id}</span>}
+              {n.name}
+            </span>
+            {n.isOverdue && (
+              <span style={{background:C.red,color:"#fff",fontSize:8,fontWeight:700,padding:"2px 6px",borderRadius:3,marginLeft:4}}>OVR</span>
+            )}
+          </div>
+          {isProj && proj && (
+            <div style={{display:"flex",alignItems:"center",gap:6,fontSize:10,color:C.inkSub,marginTop:3,marginLeft:17}}>
+              <span style={{background:projColor+"22",color:projColor,padding:"1px 6px",borderRadius:3,fontFamily:"'JetBrains Mono',monospace",fontWeight:700}}>{proj.key}</span>
+              <span>{proj.totalEpics} {n.children.some(c=>c.kind==="customer") ? "customers" : "epics"} · {proj.doneEpics} done</span>
+            </div>
+          )}
+        </div>
+        <div style={{flex:1, position:"relative", borderLeft:`1px solid ${C.border}`, height:"100%"}}>
+          {/* Month gridlines */}
+          {months.map((m,i) => (
+            <div key={i} style={{position:"absolute", top:0, bottom:0, left:`${pct(m)}%`, width:1, background:"#F1F5F9"}}/>
+          ))}
+          {/* Today line */}
+          <div style={{position:"absolute",top:0,bottom:0,left:`${todayPct}%`,width:2,background:"#F59E0B",zIndex:20}}/>
+          {/* Bar for non-project nodes */}
+          {!isProj && renderBar(n, height)}
+          {/* Project ghost outline */}
+          {isProj && (() => {
+            const span = projectSpan(n);
+            const g = barGeom(span.start, span.end);
+            if (!g) return null;
+            return (
+              <div style={{
+                position:"absolute", top: (height - 14) / 2, height: 14,
+                left:`${g.left}%`, width:`${g.width}%`,
+                border:`2px dashed ${projColor}`, borderRadius: 8, background:"transparent",
+              }}/>
+            );
+          })()}
+        </div>
+      </div>
+    );
+
+    if (!isCollapsed) {
+      for (const c of n.children) out.push(...renderRow(c, depth + 1));
+    }
+    return out;
+  };
+
   return (
-    <div style={{padding:14}}>
-      <div style={{fontSize:13,color:C.inkMid}}>Status chips, headers, rows — implementation in next task. {bundle.tree.length} project(s) loaded.</div>
+    <div style={{padding:"12px 14px",overflowX:"auto"}}>
+      {/* Status chips */}
+      <div style={{display:"flex",gap:8,marginBottom:10,flexWrap:"wrap"}}>
+        {STATUS_CHIPS.map(c => {
+          const count = c === "All"
+            ? bundle.tree.reduce((s,n)=>s+countByChip([n],"All"),0)
+            : countByChip(bundle.tree, c);
+          const active = chip === c;
+          return (
+            <button key={c} onClick={()=>setChip(c)} className="btn"
+              style={{
+                padding:"5px 12px", borderRadius:14, fontSize:11, fontWeight:700,
+                background: active ? C.teal : "#fff",
+                color: active ? "#fff" : C.inkMid,
+                border: `1.5px solid ${active ? C.teal : C.border}`,
+                display:"inline-flex", alignItems:"center", gap:6,
+              }}>
+              {c} <span style={{opacity:.75,fontWeight:500}}>{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div style={{display:"flex",gap:14,flexWrap:"wrap",marginBottom:10,fontSize:11,color:C.inkSub}}>
+        {(["Done","In Progress","To Do","Delay","On Hold","Review"] as const).map(s => (
+          <div key={s} style={{display:"flex",alignItems:"center",gap:6}}>
+            <div style={{width:12,height:10,borderRadius:3,background:treeColor(s)}}/>
+            {s}
+          </div>
+        ))}
+      </div>
+
+      {/* Header */}
+      <div style={{display:"flex",alignItems:"flex-end",borderBottom:`1px solid ${C.border}`,paddingBottom:6,marginBottom:4}}>
+        <div style={{width:LABEL_W,flexShrink:0,fontSize:10,fontWeight:700,color:C.inkDim,textTransform:"uppercase",letterSpacing:".07em"}}>
+          Project / Epic
+        </div>
+        <div style={{flex:1,position:"relative",borderLeft:`1px solid ${C.border}`,display:"flex"}}>
+          {months.map((m,i) => (
+            <div key={i} style={{flex:1,textAlign:"center",fontSize:10,fontWeight:700,color:C.inkDim,fontFamily:"'JetBrains Mono',monospace"}}>
+              {m.toLocaleDateString("en-US",{month:"short"}).toUpperCase()}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Body */}
+      <div style={{position:"relative"}}>
+        {bundle.tree.flatMap(n => renderRow(n, 0))}
+      </div>
+
+      {/* Today footer */}
+      <div style={{display:"flex",alignItems:"center",gap:10,fontSize:11,color:C.inkSub,marginTop:8}}>
+        <div style={{width:18,height:2,background:"#F59E0B"}}/>
+        Today ({today.toLocaleDateString("en-US",{day:"2-digit",month:"short",year:"numeric"})})
+        <div style={{width:18,height:8,border:"1.5px dashed #A3B5CC",borderRadius:2,marginLeft:14}}/>
+        New dates (revised)
+        <span style={{marginLeft:14,color:C.inkDim}}>· Click ▸ to expand</span>
+      </div>
     </div>
   );
 }
