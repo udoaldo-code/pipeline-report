@@ -211,7 +211,7 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:${C.teal}!impo
    TYPES
 ════════════════════════════════════════════ */
 type HistEntry = { wk: string; stage: string; note: string; by: string; ts: string };
-type Deal = { id: string; pid: string; name: string; owner: string; val: number; stage: string; pri: string; notes: string; hist: HistEntry[]; at: string; dueDate?: string };
+type Deal = { id: string; pid: string; name: string; owner: string; val: number; stage: string; pri: string; notes: string; hist: HistEntry[]; at: string; dueDate?: string; lead?: string };
 type Pipeline = typeof PIPES[number];
 type ModalState = { type: "deal"; data: Deal } | { type: "add" } | { type: "sf" } | null;
 
@@ -308,6 +308,10 @@ function EmptyState({msg="No deals in this stage yet."}: {msg?: string}) {
 ════════════════════════════════════════════ */
 function ReportView({ pipeline, deals, filtered, fPipe, onOpen }: { pipeline: Pipeline; deals: Deal[]; filtered: Deal[]; fPipe: string; onOpen: (d: Deal) => void }) {
   const list = fPipe === "all" ? filtered : deals;
+  const showLead = pipeline.id === "sales";
+  const headers = showLead
+    ? ["Deal / Project","Lead","Owner","Stage","Priority","Value","Last Update","Week",""]
+    : ["Deal / Project","Owner","Stage","Priority","Value","Last Update","Week",""];
   return (
     <div style={{overflowX:"auto"}}>
       {list.length === 0 && <EmptyState/>}
@@ -315,7 +319,7 @@ function ReportView({ pipeline, deals, filtered, fPipe, onOpen }: { pipeline: Pi
         <table className="data-table" style={{width:"100%"}}>
           <thead>
             <tr>
-              {["Deal / Project","Owner","Stage","Priority","Value","Last Update","Week",""].map((h,i)=>(
+              {headers.map((h,i)=>(
                 <th key={i} style={{background:C.ink,fontSize:11,whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr>
@@ -335,6 +339,13 @@ function ReportView({ pipeline, deals, filtered, fPipe, onOpen }: { pipeline: Pi
                       </div>
                     </div>
                   </td>
+                  {showLead && (
+                    <td style={{whiteSpace:"nowrap"}}>
+                      {d.lead
+                        ? <span style={{fontSize:11,fontWeight:700,color:C.teal,background:C.tealLt,padding:"3px 8px",borderRadius:4,border:`1px solid ${C.teal}33`}}>{d.lead}</span>
+                        : <span style={{fontSize:11,color:C.inkDim}}>—</span>}
+                    </td>
+                  )}
                   <td style={{whiteSpace:"nowrap"}}>
                     <div style={{display:"flex",alignItems:"center",gap:6}}>
                       <div style={{width:22,height:22,borderRadius:11,background:p.lt,border:`1px solid ${p.color}33`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,color:p.color}}>{(d.owner||"?")[0].toUpperCase()}</div>

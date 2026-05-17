@@ -13,6 +13,7 @@ export type Deal = {
   hist: { wk: string; stage: string; note: string; by: string; ts: string }[];
   at: string;
   dueDate?: string;
+  lead?: string;
 };
 
 type JiraIssue = {
@@ -25,6 +26,7 @@ type JiraIssue = {
     duedate: string | null;
     created: string;
     customfield_10015: string | null;
+    parent?: { key: string } | null;
   };
 };
 
@@ -103,7 +105,7 @@ export async function fetchProjectStatusesUnion(
 export async function searchIssues(jql: string): Promise<JiraIssue[]> {
   const fields = [
     "summary", "status", "assignee", "priority",
-    "duedate", "created", "customfield_10015",
+    "duedate", "created", "customfield_10015", "parent",
   ].join(",");
   const all: JiraIssue[] = [];
   let nextPageToken: string | undefined;

@@ -20,20 +20,29 @@ const CACHE_TTL_MS = 30 * 60 * 1000;
 let cache: { payload: Omit<Payload, "source">; expiresAt: number } | null = null;
 
 async function buildFresh(): Promise<Omit<Payload, "source">> {
-  const [salesStages, projectStages, salesIssues, projectIssues] = await Promise.all([
+  const [salesStages, projectStages, salesIssues, projectIssues, leadIssues] = await Promise.all([
     fetchProjectStatuses("BDM", "Customer"),
     fetchProjectStatusesUnion(["EP", "GOR", "RP"], "Epic"),
     searchIssues('project = BDM AND issuetype = Customer'),
     searchIssues('project IN (EP, GOR, RP) AND issuetype = Epic'),
+    searchIssues('project = BDM AND issuetype = Lead'),
   ]);
-  const deals: Deal[] = [
-    ...salesIssues.map(i => issueToDeal(i, "sales")),
-    ...projectIssues.map(i => issueToDeal(i, "project")),
-  ];
+
+  const leadName = new Map<string, string>();
+  for (const l of leadIssues) leadName.set(l.key, l.fields.summary || l.key);
+
+  const salesDeals: Deal[] = salesIssues.map(i => {
+    const d = issueToDeal(i, "sales");
+    const parentKey = i.fields.parent?.key;
+    if (parentKey && leadName.has(parentKey)) d.lead = leadName.get(parentKey)!;
+    return d;
+  });
+  const projectDeals: Deal[] = projectIssues.map(i => issueToDeal(i, "project"));
+
   return {
     ok: true,
     syncedAt: new Date().toISOString(),
-    deals,
+    deals: [...salesDeals, ...projectDeals],
     salesStages,
     projectStages,
   };
