@@ -306,8 +306,8 @@ function EmptyState({msg="No deals in this stage yet."}: {msg?: string}) {
 /* ════════════════════════════════════════════
    REPORT VIEW
 ════════════════════════════════════════════ */
-function ReportView({ pipeline, deals, filtered, fPipe, onOpen }: { pipeline: Pipeline; deals: Deal[]; filtered: Deal[]; fPipe: string; onOpen: (d: Deal) => void }) {
-  const list = fPipe === "all" ? filtered : deals;
+function ReportView({ pipeline, deals: _deals, filtered, fPipe: _fPipe, onOpen }: { pipeline: Pipeline; deals: Deal[]; filtered: Deal[]; fPipe: string; onOpen: (d: Deal) => void }) {
+  const list = filtered.filter(d => d.pid === pipeline.id);
   const showLead = pipeline.id === "sales";
   const headers = showLead
     ? ["Deal / Project","Lead","Owner","Stage","Priority","Value","Last Update","Week",""]
