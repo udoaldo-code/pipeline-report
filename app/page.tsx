@@ -306,7 +306,38 @@ function EmptyState({msg="No deals in this stage yet."}: {msg?: string}) {
 /* ════════════════════════════════════════════
    REPORT VIEW
 ════════════════════════════════════════════ */
-function ReportView({ pipeline, deals: _deals, filtered, fPipe: _fPipe, onOpen }: { pipeline: Pipeline; deals: Deal[]; filtered: Deal[]; fPipe: string; onOpen: (d: Deal) => void }) {
+function ValueCell({ deal, onSave }: { deal: Deal; onSave: (val: number) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [val, setVal] = useState(String(deal.val || ""));
+  useEffect(() => { setVal(String(deal.val || "")); }, [deal.val]);
+  if (!editing) {
+    return (
+      <span onClick={(e) => { e.stopPropagation(); setEditing(true); }}
+        title="Click to edit"
+        style={{cursor:"text", fontFamily:"'JetBrains Mono',monospace", fontWeight:700,
+          color: deal.val ? C.teal : C.inkDim, fontSize:12, whiteSpace:"nowrap"}}>
+        {deal.val ? money(deal.val) : "—"} <span style={{opacity:.5,fontSize:10}}>✏</span>
+      </span>
+    );
+  }
+  const commit = () => { onSave(parseFloat(val) || 0); setEditing(false); };
+  return (
+    <input
+      type="number" autoFocus
+      value={val}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => setVal(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") commit();
+        if (e.key === "Escape") { setVal(String(deal.val || "")); setEditing(false); }
+      }}
+      style={{...iSt, width:130, fontFamily:"'JetBrains Mono',monospace", padding:"6px 8px", fontSize:12}}
+    />
+  );
+}
+
+function ReportView({ pipeline, deals: _deals, filtered, fPipe: _fPipe, onOpen, onUpdateValue }: { pipeline: Pipeline; deals: Deal[]; filtered: Deal[]; fPipe: string; onOpen: (d: Deal) => void; onUpdateValue: (id: string, val: number) => void }) {
   const list = filtered.filter(d => d.pid === pipeline.id);
   const showLead = pipeline.id === "sales";
   const headers = showLead
@@ -354,7 +385,7 @@ function ReportView({ pipeline, deals: _deals, filtered, fPipe: _fPipe, onOpen }
                   </td>
                   <td><span className="stage-pill" style={{background:p.lt,color:p.color}}>{d.stage}</span></td>
                   <td><PriBadge p={d.pri}/></td>
-                  <td style={{fontFamily:"'JetBrains Mono',monospace",fontWeight:700,color:d.val?C.teal:C.inkDim,fontSize:12,whiteSpace:"nowrap"}}>{money(d.val)}</td>
+                  <td onClick={(e) => e.stopPropagation()}><ValueCell deal={d} onSave={(v) => onUpdateValue(d.id, v)}/></td>
                   <td style={{fontSize:11,color:C.inkSub,maxWidth:160}}>{last?.note?.slice(0,50)}{(last?.note?.length??0)>50?"…":""}</td>
                   <td><span style={{fontFamily:"'JetBrains Mono',monospace",fontSize:10,color:C.inkDim,background:"#F1F5F9",padding:"2px 7px",borderRadius:4,border:`1px solid ${C.border}`,whiteSpace:"nowrap"}}>{last?.wk}</span></td>
                   <td><span style={{fontSize:18,color:C.inkDim}}>›</span></td>
@@ -1143,6 +1174,21 @@ export default function Page() {
   };
   const delDeal = (id: string) => { setDeals(p=>p.filter(d=>d.id!==id)); setModal(null); };
 
+  const VAL_OVERRIDES_KEY = "pipeline-val-overrides";
+  const readValOverrides = (): Record<string, number> => {
+    if (typeof window === "undefined") return {};
+    try { const raw = window.localStorage.getItem(VAL_OVERRIDES_KEY); return raw ? JSON.parse(raw) : {}; }
+    catch { return {}; }
+  };
+  const writeValOverrides = (m: Record<string, number>) => {
+    if (typeof window === "undefined") return;
+    try { window.localStorage.setItem(VAL_OVERRIDES_KEY, JSON.stringify(m)); } catch {}
+  };
+  const updateValue = (id: string, val: number) => {
+    const m = readValOverrides(); m[id] = val; writeValOverrides(m);
+    setDeals(prev => prev.map(d => d.id === id ? {...d, val} : d));
+  };
+
   const fetchJira = async (force = false) => {
     setSync(s => ({...s, loading: true}));
     try {
@@ -1152,7 +1198,9 @@ export default function Page() {
         fetch(`/api/jira/tree${qs}`,   {cache: "no-store"}).then(r => r.json()),
       ]);
       if (dr.ok) {
-        setDeals(dr.deals as Deal[]);
+        const ovr = readValOverrides();
+        const deals = (dr.deals as Deal[]).map(d => ovr[d.id] !== undefined ? {...d, val: ovr[d.id]} : d);
+        setDeals(deals);
         setJiraStages({sales: dr.salesStages, project: dr.projectStages});
       }
       if (tr.ok) {
@@ -1359,7 +1407,7 @@ export default function Page() {
             <div className="card" style={{borderRadius:"0 0 10px 10px",borderTop:"none",overflow:"hidden"}}>
               {view==="report"  && pipeline.id === "project"
                 ? <TreeReportView bundle={treeData.project}/>
-                : view==="report" && <ReportView  pipeline={pipeline} deals={pDeals} filtered={filtered} fPipe={fPipe} onOpen={d=>setModal({type:"deal",data:d})}/>}
+                : view==="report" && <ReportView  pipeline={pipeline} deals={pDeals} filtered={filtered} fPipe={fPipe} onOpen={d=>setModal({type:"deal",data:d})} onUpdateValue={updateValue}/>}
               {view==="board"   && <BoardView   pipeline={pipeline} deals={pDeals} onOpen={d=>setModal({type:"deal",data:d})} stages={pipelineStages(pipeline.id)}/>}
               {view==="history" && <HistoryView pipeline={pipeline} deals={pDeals}/>}
               {view==="gantt"   && <GanttTreeView bundle={pipeline.id === "sales" ? treeData.sales : pipeline.id === "project" ? treeData.project : null}/>}
