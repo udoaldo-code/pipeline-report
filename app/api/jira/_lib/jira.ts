@@ -340,21 +340,18 @@ function buildProjectTree(
   return { projects, tree };
 }
 
+const PROJECT_KEYS = ["GOR", "EP", "BR", "RP", "DMS", "UPM", "SYN"] as const;
+
 export async function fetchTree(): Promise<{ sales: TreeBundle; project: TreeBundle }> {
-  const [bdmMeta, epMeta, gorMeta, rpMeta, bdmIssues, projectIssues] = await Promise.all([
+  const [bdmMeta, projectMetas, bdmIssues, projectIssues] = await Promise.all([
     fetchProjectMeta("BDM"),
-    fetchProjectMeta("EP"),
-    fetchProjectMeta("GOR"),
-    fetchProjectMeta("RP"),
+    Promise.all(PROJECT_KEYS.map(k => fetchProjectMeta(k))),
     searchIssuesWithChangelog('project = BDM AND issuetype IN (Lead, Customer)'),
-    searchIssuesWithChangelog('project IN (EP, GOR, RP) AND issuetype IN (Epic, Task, Subtask, "Sub-task", Story)'),
+    searchIssuesWithChangelog(`project IN (${PROJECT_KEYS.join(", ")}) AND issuetype IN (Epic, Task, Subtask, "Sub-task", Story)`),
   ]);
   const sales = buildProjectTree(new Map([["BDM", bdmMeta]]), bdmIssues, 0, false);
-  const project = buildProjectTree(
-    new Map([["EP", epMeta], ["GOR", gorMeta], ["RP", rpMeta]]),
-    projectIssues,
-    1, // offset so project palette starts at a different color than sales
-    false,
-  );
+  const projectMap = new Map<string, { key: string; name: string }>();
+  PROJECT_KEYS.forEach((k, i) => projectMap.set(k, projectMetas[i]));
+  const project = buildProjectTree(projectMap, projectIssues, 1, false);
   return { sales, project };
 }

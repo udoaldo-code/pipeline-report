@@ -22,9 +22,9 @@ let cache: { payload: Omit<Payload, "source">; expiresAt: number } | null = null
 async function buildFresh(): Promise<Omit<Payload, "source">> {
   const [salesStages, projectStages, salesIssues, projectIssues, leadIssues] = await Promise.all([
     fetchProjectStatuses("BDM", "Customer"),
-    fetchProjectStatusesUnion(["EP", "GOR", "RP"], "Epic"),
+    fetchProjectStatusesUnion(["GOR", "EP", "BR", "RP", "DMS", "UPM", "SYN"], "Epic"),
     searchIssues('project = BDM AND issuetype = Customer'),
-    searchIssues('project IN (EP, GOR, RP) AND issuetype = Epic'),
+    searchIssues('project IN (GOR, EP, BR, RP, DMS, UPM, SYN) AND issuetype = Epic'),
     searchIssues('project = BDM AND issuetype = Lead'),
   ]);
 
