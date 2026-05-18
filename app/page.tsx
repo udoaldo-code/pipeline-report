@@ -87,9 +87,10 @@ const week = (d = new Date()) => {
 };
 const money = (v: number) => {
   if(!v) return "—";
-  if(v>=1e9) return `Rp ${(v/1e9).toFixed(1)}B`;
-  if(v>=1e6) return `Rp ${(v/1e6).toFixed(0)}M`;
-  return `Rp ${v.toLocaleString("id-ID")}`;
+  if(v>=1e9) return `$${(v/1e9).toFixed(1)}B`;
+  if(v>=1e6) return `$${(v/1e6).toFixed(1)}M`;
+  if(v>=1e3) return `$${(v/1e3).toFixed(1)}K`;
+  return `$${v.toLocaleString("en-US")}`;
 };
 const nowStr = () => {
   const d = new Date();
@@ -1005,7 +1006,7 @@ function AddSheet({pipeline, onClose, onAdd, stages}: { pipeline: Pipeline; onCl
         <button className="btn btn-ghost" onClick={onClose} style={{width:30,height:30,padding:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>✕</button>
       </div>
       <div style={{overflowY:"auto",flex:1,padding:"16px 18px",display:"flex",flexDirection:"column",gap:13}}>
-        {(([["Deal Name *","name","text"],["Owner","owner","text"],["Value (Rp)","val","number"]] as [string,string,string][])).map(([lbl,k,type])=>(
+        {(([["Deal Name *","name","text"],["Owner","owner","text"],["Value (USD)","val","number"]] as [string,string,string][])).map(([lbl,k,type])=>(
           <div key={k}><div style={lblSt}>{lbl}</div><input type={type} value={f[k as keyof typeof f]} onChange={e=>upd(k,e.target.value)} style={iSt}/></div>
         ))}
         <div><div style={lblSt}>Notes</div><textarea value={f.notes} onChange={e=>upd("notes",e.target.value)} rows={2} placeholder="Optional…" style={{...iSt,resize:"vertical" as const}}/></div>
