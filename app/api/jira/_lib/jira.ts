@@ -121,7 +121,12 @@ export async function searchIssues(jql: string): Promise<JiraIssue[]> {
   return all;
 }
 
-export function issueToDeal(issue: JiraIssue, pid: "sales" | "project"): Deal {
+export function issueToDeal(
+  issue: JiraIssue,
+  pid: "sales" | "project" | "product",
+  parentKey?: string,
+  kind?: "epic" | "story",
+): Deal {
   const f = issue.fields;
   const at = f.customfield_10015 ? dateOnly(f.customfield_10015) : dateOnly(f.created);
   const deal: Deal = {
@@ -137,6 +142,8 @@ export function issueToDeal(issue: JiraIssue, pid: "sales" | "project"): Deal {
     at,
   };
   if (f.duedate) deal.dueDate = f.duedate;
+  if (parentKey) deal.parent = parentKey;
+  if (kind) deal.kind = kind;
   return deal;
 }
 
