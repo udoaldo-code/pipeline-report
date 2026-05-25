@@ -214,7 +214,7 @@ input:focus,textarea:focus,select:focus{outline:none;border-color:${C.teal}!impo
    TYPES
 ════════════════════════════════════════════ */
 type HistEntry = { wk: string; stage: string; note: string; by: string; ts: string };
-type Deal = { id: string; pid: string; name: string; owner: string; val: number; stage: string; pri: string; notes: string; hist: HistEntry[]; at: string; dueDate?: string; lead?: string };
+type Deal = { id: string; pid: string; name: string; owner: string; val: number; stage: string; pri: string; notes: string; hist: HistEntry[]; at: string; dueDate?: string; lead?: string; parent?: string; kind?: "epic" | "story" };
 type Pipeline = typeof PIPES[number];
 type ModalState = { type: "deal"; data: Deal } | { type: "add" } | { type: "sf" } | null;
 
@@ -405,10 +405,15 @@ function ReportView({ pipeline, deals: _deals, filtered, fPipe: _fPipe, onOpen, 
 /* ════════════════════════════════════════════
    DEAL CARD
 ════════════════════════════════════════════ */
-function DealCard({ deal, pipeline, onClick, i=0 }: { deal: Deal; pipeline: Pipeline; onClick: () => void; i?: number }) {
+function DealCard({ deal, pipeline, onClick, i=0, epicName }: { deal: Deal; pipeline: Pipeline; onClick: () => void; i?: number; epicName?: string }) {
   const last = deal.hist[deal.hist.length-1];
   return (
     <div onClick={onClick} className="card card-hover fu" style={{padding:"14px 16px",cursor:"pointer",borderLeft:`4px solid ${pipeline.color}`,animationDelay:`${i*35}ms`,borderRadius:8}}>
+      {epicName && (
+        <div style={{fontSize:10,fontWeight:700,color:pipeline.color,background:pipeline.lt,padding:"2px 7px",borderRadius:4,display:"inline-block",marginBottom:6,border:`1px solid ${pipeline.color}33`}}>
+          {epicName}
+        </div>
+      )}
       <div style={{display:"flex",justifyContent:"space-between",gap:10,marginBottom:9}}>
         <div style={{fontWeight:700,fontSize:14,color:C.ink,lineHeight:1.35,flex:1}}>{deal.name}</div>
         <PriBadge p={deal.pri}/>
@@ -431,16 +436,17 @@ function DealCard({ deal, pipeline, onClick, i=0 }: { deal: Deal; pipeline: Pipe
 /* ════════════════════════════════════════════
    BOARD VIEW
 ════════════════════════════════════════════ */
-function BoardView({pipeline, deals, onOpen, stages}: { pipeline: Pipeline; deals: Deal[]; onOpen: (d: Deal) => void; stages: string[] }) {
+function BoardView({pipeline, deals, onOpen, stages, epicNames}: { pipeline: Pipeline; deals: Deal[]; onOpen: (d: Deal) => void; stages: string[]; epicNames?: Record<string, string> }) {
   const [sel, setSel] = useState(stages[0]);
   useEffect(()=>setSel(stages[0]),[pipeline.id, stages]);
-  const sd = deals.filter(d=>d.stage===sel);
+  const baseList = pipeline.id === "product" ? deals.filter(d => d.kind === "story") : deals;
+  const sd = baseList.filter(d=>d.stage===sel);
   const sv = sd.reduce((s,d)=>s+(d.val||0),0);
   return (
     <div style={{padding:"16px"}}>
       <div style={{display:"flex",gap:6,overflowX:"auto",paddingBottom:8,marginBottom:12}}>
         {stages.map(s=>{
-          const cnt = deals.filter(d=>d.stage===s).length, act = sel===s;
+          const cnt = baseList.filter(d=>d.stage===s).length, act = sel===s;
           return (
             <button key={s} onClick={()=>setSel(s)} className="btn"
               style={{padding:"6px 14px",borderRadius:20,fontSize:12,fontWeight:act?700:600,background:act?pipeline.color:"#F1F5F9",color:act?"#fff":C.inkMid,border:`1.5px solid ${act?pipeline.color:C.border}`,whiteSpace:"nowrap",display:"flex",alignItems:"center",gap:5,boxShadow:act?`0 2px 8px ${pipeline.color}40`:"none"}}>
@@ -456,7 +462,7 @@ function BoardView({pipeline, deals, onOpen, stages}: { pipeline: Pipeline; deal
       </div>}
       {sd.length===0 ? <EmptyState/> : (
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
-          {sd.map((d,i)=><DealCard key={d.id} deal={d} pipeline={pipeline} onClick={()=>onOpen(d)} i={i}/>)}
+          {sd.map((d,i)=><DealCard key={d.id} deal={d} pipeline={pipeline} onClick={()=>onOpen(d)} i={i} epicName={d.parent && epicNames ? epicNames[d.parent] : undefined}/>)}
         </div>
       )}
     </div>
@@ -1414,7 +1420,7 @@ export default function Page() {
                 : view==="report" && pipeline.id === "product"
                   ? <TreeReportView bundle={treeData.product}/>
                   : view==="report" && <ReportView  pipeline={pipeline} deals={pDeals} filtered={filtered} fPipe={fPipe} onOpen={d=>setModal({type:"deal",data:d})} onUpdateValue={updateValue}/>}
-              {view==="board"   && <BoardView   pipeline={pipeline} deals={pDeals} onOpen={d=>setModal({type:"deal",data:d})} stages={pipelineStages(pipeline.id)}/>}
+              {view==="board"   && <BoardView   pipeline={pipeline} deals={pDeals} onOpen={d=>setModal({type:"deal",data:d})} stages={pipelineStages(pipeline.id)} epicNames={Object.fromEntries(pDeals.filter(d=>d.kind==="epic").map(e=>[e.id,e.name]))}/>}
               {view==="history" && <HistoryView pipeline={pipeline} deals={pDeals}/>}
               {view==="gantt"   && <GanttTreeView bundle={pipeline.id === "sales" ? treeData.sales : pipeline.id === "project" ? treeData.project : pipeline.id === "product" ? treeData.product : null}/>}
             </div>
