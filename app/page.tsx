@@ -1132,7 +1132,7 @@ export default function Page() {
   const [modal,  setModal]  = useState<ModalState>(null);
   const [page,   setPage]   = useState("pipeline");
 
-  const [jiraStages, setJiraStages] = useState<{sales: string[] | null; project: string[] | null}>({sales: null, project: null});
+  const [jiraStages, setJiraStages] = useState<{sales: string[] | null; project: string[] | null; product: string[] | null}>({sales: null, project: null, product: null});
   const [sync, setSync] = useState<{at: string | null; ok: boolean; loading: boolean; error: string | null}>({at: null, ok: false, loading: true, error: null});
   type TreeNodeC = {
     id: string;
@@ -1149,11 +1149,12 @@ export default function Page() {
   };
   type ProjectMetaC = { key: string; name: string; color: string; totalEpics: number; doneEpics: number };
   type TreeBundleC = { projects: ProjectMetaC[]; tree: TreeNodeC[] };
-  const [treeData, setTreeData] = useState<{sales: TreeBundleC | null; project: TreeBundleC | null}>({sales: null, project: null});
+  const [treeData, setTreeData] = useState<{sales: TreeBundleC | null; project: TreeBundleC | null; product: TreeBundleC | null}>({sales: null, project: null, product: null});
 
   const pipelineStages = (pid: string): string[] => {
     if (pid === "sales"   && jiraStages.sales)   return jiraStages.sales;
     if (pid === "project" && jiraStages.project) return jiraStages.project;
+    if (pid === "product" && jiraStages.product) return jiraStages.product;
     return PIPES.find(p => p.id === pid)?.stages ?? [];
   };
 
@@ -1204,10 +1205,10 @@ export default function Page() {
         const ovr = readValOverrides();
         const deals = (dr.deals as Deal[]).map(d => ovr[d.id] !== undefined ? {...d, val: ovr[d.id]} : d);
         setDeals(deals);
-        setJiraStages({sales: dr.salesStages, project: dr.projectStages});
+        setJiraStages({sales: dr.salesStages, project: dr.projectStages, product: dr.productStages});
       }
       if (tr.ok) {
-        setTreeData({sales: tr.sales, project: tr.project});
+        setTreeData({sales: tr.sales, project: tr.project, product: tr.product});
       }
       if (dr.ok || tr.ok) {
         setSync({at: dr.syncedAt || tr.syncedAt, ok: true, loading: false, error: null});
