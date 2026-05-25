@@ -14,6 +14,8 @@ export type Deal = {
   at: string;
   dueDate?: string;
   lead?: string;
+  parent?: string;
+  kind?: "epic" | "story";
 };
 
 type JiraIssue = {
