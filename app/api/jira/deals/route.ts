@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import {
   type Deal, JiraApiError, JiraConfigError,
   fetchProjectStatuses, fetchProjectStatusesUnion, searchIssues, issueToDeal,
+  unionOrdered,
 } from "../_lib/jira";
 
 export const runtime = "nodejs";
@@ -14,18 +15,28 @@ type Payload = {
   deals: Deal[];
   salesStages: string[];
   projectStages: string[];
+  productStages: string[];
 };
 
 const CACHE_TTL_MS = 30 * 60 * 1000;
 let cache: { payload: Omit<Payload, "source">; expiresAt: number } | null = null;
 
 async function buildFresh(): Promise<Omit<Payload, "source">> {
-  const [salesStages, projectStages, salesIssues, projectIssues, leadIssues] = await Promise.all([
+  const [
+    salesStages, projectStages,
+    salesIssues, projectIssues, leadIssues,
+    productEpicStages, productStoryStages,
+    productEpics, productStories,
+  ] = await Promise.all([
     fetchProjectStatuses("BDM", "Customer"),
     fetchProjectStatusesUnion(["GOR", "EP", "BR", "RP", "DMS", "UPM", "SYN"], "Epic"),
     searchIssues('project = BDM AND issuetype = Customer'),
     searchIssues('project IN (GOR, EP, BR, RP, DMS, UPM, SYN) AND issuetype = Epic'),
     searchIssues('project = BDM AND issuetype = Lead'),
+    fetchProjectStatuses("PD", "Epic"),
+    fetchProjectStatuses("PD", "Story"),
+    searchIssues('project = PD AND issuetype = Epic'),
+    searchIssues('project = PD AND issuetype = Story'),
   ]);
 
   const leadName = new Map<string, string>();
@@ -39,12 +50,20 @@ async function buildFresh(): Promise<Omit<Payload, "source">> {
   });
   const projectDeals: Deal[] = projectIssues.map(i => issueToDeal(i, "project"));
 
+  const productDeals: Deal[] = [
+    ...productEpics.map(i => issueToDeal(i, "product", undefined, "epic")),
+    ...productStories.map(i => issueToDeal(i, "product", i.fields.parent?.key, "story")),
+  ];
+
+  const productStages = unionOrdered(productEpicStages, productStoryStages);
+
   return {
     ok: true,
     syncedAt: new Date().toISOString(),
-    deals: [...salesDeals, ...projectDeals],
+    deals: [...salesDeals, ...projectDeals, ...productDeals],
     salesStages,
     projectStages,
+    productStages,
   };
 }
 
