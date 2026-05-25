@@ -83,6 +83,13 @@ const PRIORITY_MAP: Record<string, string> = {
 const mapPriority = (p: string | null | undefined): string =>
   (p && PRIORITY_MAP[p]) || "Medium";
 
+export const unionOrdered = (a: string[], b: string[]): string[] => {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const s of [...a, ...b]) if (!seen.has(s)) { seen.add(s); out.push(s); }
+  return out;
+};
+
 const dateOnly = (iso: string): string => iso.slice(0, 10);
 
 export async function fetchProjectStatuses(projectKey: string, issuetypeName: string): Promise<string[]> {
