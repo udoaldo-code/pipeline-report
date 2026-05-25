@@ -358,16 +358,23 @@ function buildProjectTree(
 
 const PROJECT_KEYS = ["GOR", "EP", "BR", "RP", "DMS", "UPM", "SYN"] as const;
 
-export async function fetchTree(): Promise<{ sales: TreeBundle; project: TreeBundle }> {
-  const [bdmMeta, projectMetas, bdmIssues, projectIssues] = await Promise.all([
+export async function fetchTree(): Promise<{
+  sales: TreeBundle;
+  project: TreeBundle;
+  product: TreeBundle;
+}> {
+  const [bdmMeta, projectMetas, pdMeta, bdmIssues, projectIssues, pdIssues] = await Promise.all([
     fetchProjectMeta("BDM"),
     Promise.all(PROJECT_KEYS.map(k => fetchProjectMeta(k))),
+    fetchProjectMeta("PD"),
     searchIssuesWithChangelog('project = BDM AND issuetype IN (Lead, Customer)'),
     searchIssuesWithChangelog(`project IN (${PROJECT_KEYS.join(", ")}) AND issuetype IN (Epic, Task, Subtask, "Sub-task", Story)`),
+    searchIssuesWithChangelog('project = PD AND issuetype IN (Epic, Story)'),
   ]);
   const sales = buildProjectTree(new Map([["BDM", bdmMeta]]), bdmIssues, 0, false);
   const projectMap = new Map<string, { key: string; name: string }>();
   PROJECT_KEYS.forEach((k, i) => projectMap.set(k, projectMetas[i]));
   const project = buildProjectTree(projectMap, projectIssues, 1, false);
-  return { sales, project };
+  const product = buildProjectTree(new Map([["PD", pdMeta]]), pdIssues, 1 + PROJECT_KEYS.length, false);
+  return { sales, project, product };
 }
