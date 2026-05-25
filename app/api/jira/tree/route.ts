@@ -10,6 +10,7 @@ type Payload = {
   source: "jira" | "cache";
   sales: TreeBundle;
   project: TreeBundle;
+  product: TreeBundle;
 };
 
 const CACHE_TTL_MS = 30 * 60 * 1000;
@@ -22,6 +23,7 @@ async function buildFresh(): Promise<Omit<Payload, "source">> {
     syncedAt: new Date().toISOString(),
     sales: data.sales,
     project: data.project,
+    product: data.product,
   };
 }
 
