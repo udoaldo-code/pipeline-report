@@ -44,12 +44,14 @@ const C = {
    PIPELINE CONFIG
 ════════════════════════════════════════════ */
 const PIPES = [
-  { id:"sales",       label:"Sales",       emoji:"💼", color:C.teal,   lt:C.tealLt,
+  { id:"sales",       label:"Sales",       emoji:"💼", color:C.teal,    lt:C.tealLt,
     stages:["Prospect","Qualified","Proposal","Negotiation","Closed Won","Closed Lost"] },
   { id:"partnership", label:"Partnership", emoji:"🤝", color:"#6366F1", lt:"#EEF2FF",
     stages:["Identified","First Contact","MOU Discussion","Due Diligence","Signed","Inactive"] },
   { id:"project",     label:"Projects",    emoji:"🚀", color:C.orange,  lt:"#FEF9EE",
     stages:["Backlog","In Discovery","In Development","UAT","Live","On Hold"] },
+  { id:"product",     label:"Product",     emoji:"🎨", color:"#3B82F6", lt:"#DBEAFE",
+    stages:[] as string[] },
 ];
 
 const VISIBLE_PIPES = PIPES.filter(p => p.id !== "partnership");
