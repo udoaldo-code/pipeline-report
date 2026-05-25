@@ -125,25 +125,25 @@ use today).
 
 No change (`partnership` still filtered out). Product visible.
 
-### Report view — expandable rows
+### Report view — reuse `TreeReportView`
 
-State:
-```ts
-const [expanded, setExpanded] = useState<Set<string>>(new Set());
+Projects tab already renders Report via existing `TreeReportView` component
+(`page.tsx:599`), which provides collapsible Epic→Task hierarchy with chevron
+toggles. Product tab reuses the same component, fed `treeData.product`.
+
+Selector logic (existing line 1409 ternary) extends to:
+
+```tsx
+view === "report" && (
+  pipeline.id === "project" ? <TreeReportView bundle={treeData.project}/> :
+  pipeline.id === "product" ? <TreeReportView bundle={treeData.product}/> :
+  <ReportView .../>
+)
 ```
 
-Visibility rule (Product tab only):
-- Epic rows (`kind==="epic"`): always rendered. Sort key = Epic order.
-- Story rows (`kind==="story"`): rendered iff `expanded.has(d.parent)`.
-- Render order: each Epic immediately followed by its Stories.
-
-Row UI:
-- Epic: chevron icon (▶ collapsed / ▼ expanded) in name column; click toggles
-  `expanded` set; child count badge appended to name (e.g., "OmniPlay · 3").
-  Epics with zero children: chevron hidden, click is no-op.
-- Story: 24px left indent, smaller font, lighter row background.
-
-Sales/Projects: unchanged (no chevron, flat list).
+No new expand state, no new row UI. Sales unchanged (still flat `ReportView`).
+PD Epic → Story hierarchy renders identically to existing
+Project-key → Epic → Task hierarchy.
 
 ### Board view
 
@@ -191,8 +191,8 @@ invalidates the unified cache as today.
 - `app/api/jira/_lib/jira.ts` — `Deal` type, `issueToDeal`, `fetchTree`.
 - `app/api/jira/deals/route.ts` — `buildFresh`, payload type.
 - `app/api/jira/tree/route.ts` — payload type.
-- `app/page.tsx` — `PIPES`, Report expand state + row render, Board card
-  source, counter banner.
+- `app/page.tsx` — `PIPES`, `treeData` state shape, Report selector ternary,
+  Board card source, counter banner.
 
 ## Testing checklist
 
