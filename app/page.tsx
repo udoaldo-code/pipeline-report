@@ -1411,7 +1411,9 @@ export default function Page() {
             <div className="card" style={{borderRadius:"0 0 10px 10px",borderTop:"none",overflow:"hidden"}}>
               {view==="report"  && pipeline.id === "project"
                 ? <TreeReportView bundle={treeData.project}/>
-                : view==="report" && <ReportView  pipeline={pipeline} deals={pDeals} filtered={filtered} fPipe={fPipe} onOpen={d=>setModal({type:"deal",data:d})} onUpdateValue={updateValue}/>}
+                : view==="report" && pipeline.id === "product"
+                  ? <TreeReportView bundle={treeData.product}/>
+                  : view==="report" && <ReportView  pipeline={pipeline} deals={pDeals} filtered={filtered} fPipe={fPipe} onOpen={d=>setModal({type:"deal",data:d})} onUpdateValue={updateValue}/>}
               {view==="board"   && <BoardView   pipeline={pipeline} deals={pDeals} onOpen={d=>setModal({type:"deal",data:d})} stages={pipelineStages(pipeline.id)}/>}
               {view==="history" && <HistoryView pipeline={pipeline} deals={pDeals}/>}
               {view==="gantt"   && <GanttTreeView bundle={pipeline.id === "sales" ? treeData.sales : pipeline.id === "project" ? treeData.project : null}/>}
