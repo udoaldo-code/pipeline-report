@@ -1416,7 +1416,7 @@ export default function Page() {
                   : view==="report" && <ReportView  pipeline={pipeline} deals={pDeals} filtered={filtered} fPipe={fPipe} onOpen={d=>setModal({type:"deal",data:d})} onUpdateValue={updateValue}/>}
               {view==="board"   && <BoardView   pipeline={pipeline} deals={pDeals} onOpen={d=>setModal({type:"deal",data:d})} stages={pipelineStages(pipeline.id)}/>}
               {view==="history" && <HistoryView pipeline={pipeline} deals={pDeals}/>}
-              {view==="gantt"   && <GanttTreeView bundle={pipeline.id === "sales" ? treeData.sales : pipeline.id === "project" ? treeData.project : null}/>}
+              {view==="gantt"   && <GanttTreeView bundle={pipeline.id === "sales" ? treeData.sales : pipeline.id === "project" ? treeData.project : pipeline.id === "product" ? treeData.product : null}/>}
             </div>
 
           </main>
