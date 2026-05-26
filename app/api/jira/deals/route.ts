@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import {
   type Deal, JiraApiError, JiraConfigError,
   fetchProjectStatuses, fetchProjectStatusesUnion, searchIssues, issueToDeal,
-  unionOrdered,
+  unionOrdered, PRODUCT_KEYS,
 } from "../_lib/jira";
 
 export const runtime = "nodejs";
@@ -33,10 +33,10 @@ async function buildFresh(): Promise<Omit<Payload, "source">> {
     searchIssues('project = BDM AND issuetype = Customer'),
     searchIssues('project IN (GOR, EP, BR, RP, DMS, UPM, SYN) AND issuetype = Epic'),
     searchIssues('project = BDM AND issuetype = Lead'),
-    fetchProjectStatuses("PD", "Epic"),
-    fetchProjectStatuses("PD", "Story"),
-    searchIssues('project = PD AND issuetype = Epic'),
-    searchIssues('project = PD AND issuetype = Story'),
+    fetchProjectStatusesUnion([...PRODUCT_KEYS], "Epic"),
+    fetchProjectStatusesUnion([...PRODUCT_KEYS], "Story"),
+    searchIssues(`project IN (${PRODUCT_KEYS.join(", ")}) AND issuetype = Epic`),
+    searchIssues(`project IN (${PRODUCT_KEYS.join(", ")}) AND issuetype = Story`),
   ]);
 
   const leadName = new Map<string, string>();
