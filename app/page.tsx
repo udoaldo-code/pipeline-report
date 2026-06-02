@@ -583,11 +583,15 @@ function matchesChip(status: string, chip: StatusChip): boolean {
 
 function countByChip(nodes: TreeNodeC2[], chip: StatusChip): number {
   let c = 0;
-  const walk = (n: TreeNodeC2) => {
-    if (n.kind !== "project" && matchesChip(n.status, chip)) c++;
-    for (const ch of n.children) walk(ch);
-  };
-  for (const n of nodes) walk(n);
+  for (const n of nodes) {
+    if (n.kind === "project") {
+      for (const ch of n.children) {
+        if (matchesChip(ch.status, chip)) c++;
+      }
+    } else {
+      if (matchesChip(n.status, chip)) c++;
+    }
+  }
   return c;
 }
 
