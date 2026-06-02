@@ -1134,7 +1134,7 @@ function JiraSyncPill({sync, onRefresh}: {
 export default function Page() {
   const [deals,  setDeals]  = useState<Deal[]>(SEED.filter(d => d.pid !== "partnership"));
   const [pipe,   setPipe]   = useState("sales");
-  const [view,   setView]   = useState("report");
+  const [view,   setView]   = useState("gantt");
   const [modal,  setModal]  = useState<ModalState>(null);
   const [page,   setPage]   = useState("pipeline");
 
@@ -1362,7 +1362,7 @@ export default function Page() {
                       const pw = pd.filter(d=>["Closed Won","Signed","Live"].includes(d.stage)).length;
                       const pc = pd.filter(d=>d.pri==="Critical").length;
                       return (
-                        <tr key={p.id} onClick={()=>{setPipe(p.id);setView("report");}} style={{cursor:"pointer"}}>
+                        <tr key={p.id} onClick={()=>{setPipe(p.id);setView("gantt");}} style={{cursor:"pointer"}}>
                           <td style={{fontWeight:700,color:C.ink}}>
                             <span style={{display:"flex",alignItems:"center",gap:8}}>
                               <span style={{width:10,height:10,borderRadius:2,background:p.color,display:"inline-block",flexShrink:0}}/>
@@ -1403,7 +1403,7 @@ export default function Page() {
                 })}
                 <div style={{flex:1,borderBottom:`1px solid ${C.border}`}}/>
                 <div style={{display:"flex",alignItems:"center",gap:4,padding:"0 12px"}}>
-                  {([["report","📋 Report"],["board","⊞ Board"],["history","⏱ Log"],["gantt","📅 Gantt"]] as [string,string][]).map(([v,lbl])=>(
+                  {([["gantt","📅 Gantt"],["report","📋 Report"],["board","⊞ Board"],["history","⏱ Log"]] as [string,string][]).map(([v,lbl])=>(
                     <button key={v} onClick={()=>setView(v)} className="btn btn-ghost"
                       style={{fontSize:11,padding:"5px 10px",fontWeight:view===v?700:500,background:view===v?C.tealLt:"transparent",color:view===v?C.teal:C.inkSub,border:`1px solid ${view===v?C.teal+"44":C.border}`,borderRadius:5}}>
                       {lbl}
