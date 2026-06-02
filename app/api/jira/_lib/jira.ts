@@ -357,7 +357,12 @@ function buildProjectTree(
 }
 
 const PROJECT_KEYS = ["GOR", "EP", "BR", "RP", "DMS", "UPM", "SYN"] as const;
-export const PRODUCT_KEYS = ["PD", "KID"] as const;
+export const PRODUCT_KEYS = [
+  "PD", "BN", "CD", "DREAM", "DXGR", "GD", "GAM", "GP", "GAN", "GEM",
+  "GOAL", "HL", "JAW", "KID", "LF", "LDN", "SOSMED", "ABT", "LUN", "MAG",
+  "MAV", "MET", "NP3", "QN", "RVPN", "SCRL", "HG", "SLYP", "SE", "STREAM",
+  "SM", "UPM", "VM",
+] as const;
 
 export async function fetchTree(): Promise<{
   sales: TreeBundle;
