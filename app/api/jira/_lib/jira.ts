@@ -356,7 +356,11 @@ function buildProjectTree(
   return { projects, tree };
 }
 
-const PROJECT_KEYS = ["GOR", "EP", "BR", "RP", "DMS", "UPM", "SYN"] as const;
+export const PROJECT_KEYS = [
+  "RGFT", "ASA", "RP", "APA", "SSCS", "CAAV", "SK", "CM", "DSH", "DMS",
+  "DOT", "GOR", "EW", "EP", "ECCIV", "EI", "HIT", "MA", "LMA", "PPOBNEW",
+  "ARC", "RMAC", "SSKD", "SYN", "TP", "VLA", "WM", "WR", "WSA",
+] as const;
 export const PRODUCT_KEYS = [
   "PD", "BN", "CD", "DREAM", "DXGR", "GD", "GAM", "GP", "GAN", "GEM",
   "GOAL", "HL", "JAW", "KID", "LF", "LDN", "SOSMED", "ABT", "LUN", "MAG",

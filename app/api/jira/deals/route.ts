@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import {
   type Deal, JiraApiError, JiraConfigError,
   fetchProjectStatuses, fetchProjectStatusesUnion, searchIssues, issueToDeal,
-  unionOrdered, PRODUCT_KEYS,
+  unionOrdered, PRODUCT_KEYS, PROJECT_KEYS,
 } from "../_lib/jira";
 
 export const runtime = "nodejs";
@@ -29,9 +29,9 @@ async function buildFresh(): Promise<Omit<Payload, "source">> {
     productEpics, productStories,
   ] = await Promise.all([
     fetchProjectStatuses("BDM", "Customer"),
-    fetchProjectStatusesUnion(["GOR", "EP", "BR", "RP", "DMS", "UPM", "SYN"], "Epic"),
+    fetchProjectStatusesUnion([...PROJECT_KEYS], "Epic"),
     searchIssues('project = BDM AND issuetype = Customer'),
-    searchIssues('project IN (GOR, EP, BR, RP, DMS, UPM, SYN) AND issuetype = Epic'),
+    searchIssues(`project IN (${PROJECT_KEYS.join(", ")}) AND issuetype = Epic`),
     searchIssues('project = BDM AND issuetype = Lead'),
     fetchProjectStatusesUnion([...PRODUCT_KEYS], "Epic"),
     fetchProjectStatusesUnion([...PRODUCT_KEYS], "Story"),
