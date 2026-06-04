@@ -693,6 +693,13 @@ function TreeReportView({ bundle }: { bundle: TreeBundleC2 | null }) {
 function GanttTreeView({ bundle }: { bundle: TreeBundleC2 | null }) {
   const [chip, setChip] = useState<StatusChip>("All");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    if (!bundle || initialized) return;
+    setCollapsed(new Set(bundle.tree.filter(n => n.kind === "project").map(n => n.id)));
+    setInitialized(true);
+  }, [bundle, initialized]);
 
   if (!bundle) return <EmptyState msg="Loading Jira tree…"/>;
 
@@ -1426,7 +1433,7 @@ export default function Page() {
                   : view==="report" && <ReportView  pipeline={pipeline} deals={pDeals} filtered={filtered} fPipe={fPipe} onOpen={d=>setModal({type:"deal",data:d})} onUpdateValue={updateValue}/>}
               {view==="board"   && <BoardView   pipeline={pipeline} deals={pDeals} onOpen={d=>setModal({type:"deal",data:d})} stages={pipelineStages(pipeline.id)} epicNames={Object.fromEntries(pDeals.filter(d=>d.kind==="epic").map(e=>[e.id,e.name]))}/>}
               {view==="history" && <HistoryView pipeline={pipeline} deals={pDeals}/>}
-              {view==="gantt"   && <GanttTreeView bundle={pipeline.id === "sales" ? treeData.sales : pipeline.id === "project" ? treeData.project : pipeline.id === "product" ? treeData.product : null}/>}
+              {view==="gantt"   && <GanttTreeView key={pipeline.id} bundle={pipeline.id === "sales" ? treeData.sales : pipeline.id === "project" ? treeData.project : pipeline.id === "product" ? treeData.product : null}/>}
             </div>
 
           </main>
