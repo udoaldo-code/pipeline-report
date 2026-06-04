@@ -3,6 +3,7 @@ import { JiraApiError, JiraConfigError, fetchTree, type TreeBundle } from "../_l
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 300;
 
 type Payload = {
   ok: true;
